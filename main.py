@@ -26,7 +26,7 @@ class Bot(BetterBot):
 
     async def prepare_polls(self):
         async with self.pool.acquire() as cursor:
-            poll_ids: List[Tuple[int, ]] = await cursor.fetch("SELECT id FROM polls")
+            poll_ids: List[Tuple[str, ]] = await cursor.fetch("SELECT id_encode(id) FROM polls")
             for poll_id, in poll_ids:
                 poll = self.manager.init_poll(poll_id)
                 view = PollView(self, poll)

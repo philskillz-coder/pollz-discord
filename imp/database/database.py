@@ -190,12 +190,12 @@ class Database:
         return voted
 
     @staticmethod
-    async def get_poll_name(
+    async def get_poll_title(
             *,
             cursor: Connection,
             poll_hid: str
     ) -> RT_STR:
-        values: DB_STR = await cursor.fetchrow("SELECT name FROM poll_config WHERE poll = id_decode($1)", poll_hid)
+        values: DB_STR = await cursor.fetchrow("SELECT title FROM poll_config WHERE poll = id_decode($1)", poll_hid)
         name, *_ = Database.save_unpack(values)
 
         return name
@@ -212,7 +212,7 @@ class Database:
         return count
 
     @staticmethod
-    async def poll_info(
+    async def poll_description(
             *,
             cursor: Connection,
             poll_hid: str
@@ -283,6 +283,17 @@ class Database:
         return channel_id
 
     @staticmethod
+    async def get_poll_options(
+            *,
+            cursor: Connection,
+            poll_hid: str
+    ) -> Optional[List[Tuple[int, ]]]:
+        options: List[Tuple[int, ]] = await cursor.fetch(
+            "SELECT id FROM poll_options WHERE poll = id_decode($1)", poll_hid
+        )
+        return options
+
+    @staticmethod
     async def get_poll_message(
             *,
             cursor: Connection,
@@ -305,7 +316,7 @@ class Database:
     async def create_poll_option(
             *,
             cursor: Connection,
-            poll_hid: int,
+            poll_hid: str,
             option_name: str
     ) -> RT_INT:
         values: DB_INT = await cursor.fetchrow(

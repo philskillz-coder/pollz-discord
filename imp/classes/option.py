@@ -14,40 +14,24 @@ if TYPE_CHECKING:
 
 
 class PollOption:
-    def __init__(self, client: BetterBot, poll: Poll, option_id: int):
+    def __init__(self, client: BetterBot, poll: Poll, option_hid: str):
         self.client = client
         self.poll = poll
-        self._option_id = option_id
-
-        self._clean_option_id: Optional[str] = None
+        self._option_hid = option_hid
 
     @property
-    def option_id(self) -> int:
-        return self._option_id
-
-    @property
-    def clean_option_id(self):
-        if self._clean_option_id is not None:
-            return self._clean_option_id
-
-        self._clean_option_id = self.client.hash_mgr.encode(self.option_id)
-        return self._clean_option_id
+    def option_hid(self) -> str:
+        return self._option_hid
 
     async def name(self, cursor: Connection) -> Optional[str]:
         return await self.client.db_mgr.get_poll_option_name(
             cursor=cursor,
-            option_id=self.option_id
-        )
-
-    async def info(self, cursor: Connection) -> Optional[str]:
-        return await self.client.db_mgr.get_poll_option_info(
-            cursor=cursor,
-            option_id=self.option_id
+            option_hid=self.option_hid
         )
 
     async def vote_percentage(self, cursor: Connection) -> Optional[float]:
         return await self.client.db_mgr.get_poll_option_vote_percentage(
             cursor=cursor,
-            poll_id=self.poll.poll_id,
-            option_id=self.option_id
+            poll_hid=self.poll.poll_hid,
+            option_hid=self.option_hid
         )

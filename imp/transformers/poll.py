@@ -28,7 +28,7 @@ class Poll_Transformer(app_commands.Transformer, ABC):
             )
             exists = await interaction.client.db_mgr.poll_exists(
                 cursor=cursor,
-                poll_id=code
+                poll_hid=code
             )
 
             if not exists:

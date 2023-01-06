@@ -10,21 +10,21 @@ if TYPE_CHECKING:
 class PollManager:
     def __init__(self, client: BetterBot):
         self.client = client
-        self.polls: Dict[int, Poll] = {}
+        self.polls: Dict[str, Poll] = {}
 
-    def init_poll(self, poll_id: int) -> Poll:
-        _poll = Poll(self.client, poll_id)
-        self.polls[poll_id] = _poll
+    def init_poll(self, poll_hid: str) -> Poll:
+        _poll = Poll(self.client, poll_hid)
+        self.polls[poll_hid] = _poll
         return _poll
 
-    def get_poll(self, poll_id: int) -> Poll:
-        _poll = self.polls.get(poll_id)
+    def get_poll(self, poll_hid: str) -> Poll:
+        _poll = self.polls.get(poll_hid)
 
         if _poll is None:
-            _poll = self.init_poll(poll_id)
+            _poll = self.init_poll(poll_hid)
 
         return _poll
 
     def set_poll(self, poll: Poll):
-        self.polls[poll.poll_id] = poll
+        self.polls[poll.poll_hid] = poll
 

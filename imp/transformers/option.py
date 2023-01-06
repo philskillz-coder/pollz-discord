@@ -28,16 +28,16 @@ class Option_Transformer(app_commands.Transformer, ABC):
             )
             exists = await interaction.client.db_mgr.poll_option_exists(
                 cursor=cursor,
-                guild_uuid=guild_uuid,
-                option_id=code
+                guild_hid=guild_uuid,
+                option_hid=code
             )
 
             if not exists:
                 raise TransformerException(f"A poll option with the id `{code}` does not exist!")
 
-            poll_code = await interaction.client.db_mgr.get_poll_option_poll(
+            poll_code = await interaction.client.db_mgr.get_option_poll(
                 cursor=cursor,
-                option_id=code
+                option_hid=code
             )
             return await (await interaction.client.manager.get_poll(poll_code)).get_option(cursor, code)
 

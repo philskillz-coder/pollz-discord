@@ -30,5 +30,6 @@ class Listeners(BetterCog):
             else:
                 self.log("on_guild_join", f"Joined guild: {guild.id} | Already exists")
 
+
 async def setup(client: BetterBot):
     await client.add_cog(Listeners(client), guilds=client.config.GUILD_IDS)

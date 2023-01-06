@@ -32,7 +32,7 @@ class Main(BetterCog):
 
             name_exists = await self.client.db_mgr.poll_name_exists(
                 cursor=cursor,
-                guild_uuid=guild_uuid,
+                guild_hid=guild_uuid,
                 poll_name=name
             )
             if name_exists:
@@ -68,11 +68,11 @@ class Main(BetterCog):
 
             poll_id = await self.client.db_mgr.create_poll(
                 cursor=cursor,
-                guild_uuid=guild_uuid,
+                guild_hid=guild_uuid,
                 channel_id=message.channel.id,
                 message_id=message.id,
-                poll_name=name.upper(),
-                poll_info=info
+                poll_title=name.upper(),
+                poll_description=info
             )
             poll = self.client.manager.get_poll(poll_id)
             view = await PollView(self.client, poll).run(cursor)
@@ -276,7 +276,7 @@ class Main(BetterCog):
                 )
 
 
-            vote = PollVote(interaction.user.id, poll.poll_id, option.option_id)
+            vote = PollVote(interaction.user.id, poll.poll_hid, option.option_hid)
             _id = await poll.add_vote(cursor, vote)
             await poll.update(cursor)
             self.client.manager.set_poll(poll)

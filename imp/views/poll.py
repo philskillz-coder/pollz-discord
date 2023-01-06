@@ -7,11 +7,13 @@ from asyncpg import Connection
 from imp.classes.vote import PollVote
 
 from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
     from imp.better.bot import BetterBot
     from imp.better.interaction import BetterInteraction
     from imp.classes.option import PollOption
     from imp.classes.poll import Poll
+
 
 class PollOptionButton(ui.Button):
     def __init__(self, option: PollOption, label: str, custom_id: str):
@@ -25,12 +27,14 @@ class PollOptionButton(ui.Button):
 
     async def callback(self, interaction: BetterInteraction):
         async with interaction.client.pool.acquire() as cursor:
-            await self.option.poll.add_vote(cursor, PollVote(interaction.user.id, self.option.poll.poll_id, self.option.option_id))
+            await self.option.poll.add_vote(cursor, PollVote(interaction.user.id, self.option.poll.poll_hid,
+                                                             self.option.option_hid))
             await self.option.poll.update(cursor)
             await interaction.response.send_message(
-                content="Voted for %s" % self.option.clean_option_id,  # TODO: Add translation
+                content="Voted for %s" % self.option.option_hid,  # TODO: Add translation
                 ephemeral=True
             )
+
 
 class PollStartButton(ui.Button):
     def __init__(self, poll: Poll, custom_id: str):
@@ -45,14 +49,15 @@ class PollStartButton(ui.Button):
         async with interaction.client.pool.acquire() as cursor:
             await interaction.client.db_mgr.poll_start(
                 cursor=cursor,
-                poll_id=self.poll.poll_id
+                poll_hid=self.poll.poll_hid
             )
             await self.poll.update(cursor)
             await interaction.response.send_message(
-                content="Started poll %s" % self.poll.clean_poll_id,
+                content="Started poll %s" % self.poll.poll_hid,
                 ephemeral=True
             )
             await self.view.press_start(cursor)
+
 
 class PollStopButton(ui.Button):
     def __init__(self, poll: Poll, custom_id: str):
@@ -67,15 +72,14 @@ class PollStopButton(ui.Button):
         async with interaction.client.pool.acquire() as cursor:
             await interaction.client.db_mgr.poll_stop(
                 cursor=cursor,
-                poll_id=self.poll.poll_id
+                poll_hid=self.poll.poll_hid
             )
             await self.poll.update(cursor)
             await interaction.response.send_message(
-                content="Stopped poll %s" % self.poll.clean_poll_id,
+                content="Stopped poll %s" % self.poll.poll_hid,
                 ephemeral=True
             )
             await self.view.press_stop()
-
 
 
 class PollView(ui.View):
@@ -89,16 +93,16 @@ class PollView(ui.View):
 
         for option in (await self.poll.options(cursor)).values():
             self.add_item(
-                PollOptionButton(option, label=await option.name(cursor), custom_id=option.clean_option_id)
+                PollOptionButton(option, label=await option.name(cursor), custom_id=option.option_hid)
             )
 
         return self
 
     async def add_stop(self):
-        self.add_item(PollStopButton(self.poll, f"{self.poll.clean_poll_id}.stop"))
+        self.add_item(PollStopButton(self.poll, f"{self.poll.poll_hid}.stop"))
 
     async def add_start(self):
-        self.add_item(PollStartButton(self.poll, f"{self.poll.clean_poll_id}.start"))
+        self.add_item(PollStartButton(self.poll, f"{self.poll.poll_hid}.start"))
 
     async def press_start(self, cursor: Connection):
         message = await self.poll.message(cursor)
@@ -118,7 +122,7 @@ class PollView(ui.View):
     async def run(self, cursor: Connection):
         started = await self.client.db_mgr.poll_started(
             cursor=cursor,
-            poll_id=self.poll.poll_id
+            poll_hid=self.poll.poll_hid
         )
 
         if started:

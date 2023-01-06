@@ -17,37 +17,33 @@ class Translator:
     async def __call__(self, cursor: Connection, guild: discord.Guild, key: str, **format_args):
         return await self.translate(cursor, guild, key, **format_args)
 
-    async def translate(
-            self,
-            cursor: Connection,
-            guild: Union[discord.Guild, str],
-            key: str,
-            **format_args
-    ):
-        if isinstance(guild, discord.Guild):
-            guild_uuid = await self.client.db_mgr.get_guild_uuid(
-                cursor=cursor,
-                guild_id=guild.id
-            )
-        else:
-            guild_uuid = guild
+    async def translate(self, cursor, guild, key: str, **kwargs):
+        return f"<TRANSLATION:{key}#{kwargs}>"
 
-        guild_language = await self.client.db_mgr.get_guild_language(
-            cursor=cursor,
-            guild_uuid=guild_uuid
-        )
-        key_id = await self.client.db_mgr.get_key_id(
-            cursor=cursor,
-            key_name=key
-        )
-        translation = await self.client.db_mgr.get_translation(
-            cursor=cursor,
-            language_id=guild_language,
-            key_id=key_id
-        )
-
-        # noinspection PyBroadException
-        try:
-            return translation.format_map(format_args)
-        except Exception as e:
-            return "TRANSLATION NOT FOUND"
+    #
+    # async def translate(
+    #         self,
+    #         cursor: Connection,
+    #         guild: Union[discord.Guild, str],
+    #         key: str,
+    #         **format_args
+    # ):
+    #     if isinstance(guild, discord.Guild):
+    #         guild_uuid = await self.client.db_mgr.get_guild_hid(
+    #             cursor=cursor,
+    #             guild_id=guild.id
+    #         )
+    #     else:
+    #         guild_uuid = guild
+    #
+    #     guild_language = await self.client.db_mgr.get_guild_language(
+    #         cursor=cursor,
+    #         guild_hid=guild_uuid
+    #     )
+    #
+    #
+    #     # noinspection PyBroadException
+    #     try:
+    #         return translation.format_map(format_args)
+    #     except Exception as e:
+    #         return "TRANSLATION NOT FOUND"
