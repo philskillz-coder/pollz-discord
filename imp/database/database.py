@@ -1,6 +1,7 @@
 from typing import Optional, Iterable, TypeVar, Tuple, List
 
 from asyncpg import Connection
+from hashids import Hashids
 
 T = TypeVar("T")
 
@@ -9,68 +10,81 @@ _STR = TypeVar("_STR")
 _INT = TypeVar("_INT")
 _FLOAT = TypeVar("_FLOAT")
 
-DB_BOOL = Optional[Tuple[_BOOL,]]
-DB_STR = Optional[Tuple[_STR,]]
-DB_INT = Optional[Tuple[_INT,]]
-DB_FLOAT = Optional[Tuple[_FLOAT,]]
+DB_BOOL = Optional[Tuple[_BOOL, ]]
+DB_STR = Optional[Tuple[_STR, ]]
+DB_INT = Optional[Tuple[_INT, ]]
+DB_FLOAT = Optional[Tuple[_FLOAT, ]]
+DB_LIST = Optional[List[T]]
 
-RT_BOOL = Optional[_BOOL]
-RT_STR = Optional[_STR]
-RT_INT = Optional[_INT]
-RT_FLOAT = Optional[_FLOAT]
+RT_BOOL = Optional[bool]
+RT_STR = Optional[str]
+RT_INT = Optional[int]
+RT_FLOAT = Optional[float]
+RT_LIST = Optional[List[T]]
+
+DB_GENERIC = Optional[Tuple[T]]
+RT_GENERIC = Optional[T]
 
 """
 CREATE EXTENSION pg_hashids;
 
 CREATE TABLE guilds (
-    id SERIAL PRIMARY KEY NOT NULL UNIQUE,
-    guild_id BIGINT NOT NULL UNIQUE
+    "id" SERIAL PRIMARY KEY NOT NULL UNIQUE,
+    "guild_id" BIGINT NOT NULL UNIQUE
 );
 
 CREATE TABLE guild_settings (
-    guild BIGINT PRIMARY KEY NOT NULL UNIQUE,
-    display_language VARCHAR(2) NOT NULL DEFAULT "en",
+    "guild" BIGINT PRIMARY KEY NOT NULL UNIQUE,
+    "display_language" VARCHAR(2) NOT NULL DEFAULT 'en',
      
-    CONSTRAINT fk_guild FOREIGN KEY(guild) REFERENCES guilds(id) ON DELETE CASCADE
+    CONSTRAINT fk_guild FOREIGN KEY("guild") REFERENCES guilds("id") ON DELETE CASCADE
 );
 
 CREATE TABLE polls (
-    id SERIAL PRIMARY KEY NOT NULL UNIQUE,
-    guild BIGINT NOT NULL,
-    started BOOLEAN NOT NULL DEFAULT FALSE,
+    "id" SERIAL PRIMARY KEY NOT NULL UNIQUE,
+    "guild" BIGINT NOT NULL,
+    "started" BOOLEAN NOT NULL DEFAULT FALSE,
     
-    CONSTRAINT fk_guild FOREIGN KEY(guild) REFERENCES guilds(id) ON DELETE CASCADE
+    CONSTRAINT fk_guild FOREIGN KEY("guild") REFERENCES guilds("id") ON DELETE CASCADE
 );
 
 CREATE TABLE poll_config (
-    poll BIGINT PRIMARY KEY NOT NULL UNIQUE,
+    "poll" BIGINT PRIMARY KEY NOT NULL UNIQUE,
     
-    title TEXT,
-    description TEXT,
-    channel_id BIGINT NOT NULL,
-    message_id BIGINT NOT NULL
+    "title" TEXT,
+    "description" TEXT,
+    "channel" BIGINT NOT NULL,
+    "message" BIGINT NOT NULL
 );
 
 CREATE TABLE poll_options (
-    id SERIAL PRIMARY KEY NOT NULL UNIQUE,
-    poll BIGINT NOT NULL,
-    name TEXT NOT NULL,
+    "id" SERIAL PRIMARY KEY NOT NULL UNIQUE,
+    "poll" BIGINT NOT NULL,
+    "name" TEXT NOT NULL,
     
-    CONSTRAINT fk_poll FOREIGN KEY(poll) REFERENCES polls(id) ON DELETE CASCADE
+    CONSTRAINT fk_poll FOREIGN KEY("poll") REFERENCES polls("id") ON DELETE CASCADE
 );
 
 CREATE TABLE poll_votes (
-    id SERIAL PRIMARY KEY NOT NULL UNIQUE,
-    option BIGINT NOT NULL,
-    user BIGINT NOT NULL,
-    UNIQUE(option, user),
+    "id" SERIAL PRIMARY KEY NOT NULL UNIQUE,
+    "option" BIGINT NOT NULL,
+    "user" BIGINT NOT NULL,
+    UNIQUE("option", "user"),
     
-    CONSTRAINT fk_option FOREIGN KEY(option) REFERENCES poll_options(id) ON DELETE CASCADE
+    CONSTRAINT fk_option FOREIGN KEY("option") REFERENCES poll_options("id") ON DELETE CASCADE
 );
 
 """
 
+
+# noinspection PyMethodMayBeStatic
 class Database:
+    def __init__(self, guild_hashids: Hashids, poll_hashids: Hashids, option_hashids: Hashids, vote_hashids: Hashids):
+        self._guild_hashids = guild_hashids
+        self._poll_hashids = poll_hashids
+        self._option_hashids = option_hashids
+        self._vote_hashids = vote_hashids
+
     @staticmethod
     def save_unpack(values: Optional[Iterable[T]]) -> Tuple[Optional[T], List[T]]:
         if not values:
@@ -79,314 +93,224 @@ class Database:
         x, *y = values
         return x, y
 
-    @staticmethod
-    async def guild_id_exists(
-            *,
-            cursor: Connection,
-            guild_id: int
-    ) -> RT_BOOL:
-        values: DB_BOOL = await cursor.fetchrow("SELECT EXISTS(SELECT 1 FROM guilds WHERE guild_id = $1);", guild_id)
+    async def guild_id_exists(self, cursor: Connection, /, guild_id: int) -> RT_BOOL:
+        values: DB_BOOL = await cursor.fetchrow("SELECT EXISTS(SELECT 1 FROM guilds WHERE \"guild_id\" = $1);", guild_id)
         exists, *_ = Database.save_unpack(values)
 
         return exists
 
-    @staticmethod
-    async def create_guild(
-            *,
-            cursor: Connection,
-            guild_id: int
-    ) -> RT_STR:
+    async def create_guild(self, cursor: Connection, /, guild_id: int) -> RT_STR:
         guild_exists = await Database.guild_id_exists(
-            cursor=cursor,
+            self,
+            cursor,
             guild_id=guild_id
         )
+
         if guild_exists:
             return None
 
         values: DB_STR = await cursor.fetchrow(
-            "INSERT INTO guilds(guild_id) VALUES($1) RETURNING id_encode(id);",
+            "INSERT INTO guilds(\"guild_id\") VALUES($1) RETURNING \"id\";",
             guild_id
         )
-        guild_hid, *_ = Database.save_unpack(values)
+        _guild_hid, *_ = Database.save_unpack(values)
+        guild_hid = self._guild_hashids.encode(_guild_hid)
 
-        await cursor.execute("INSERT INTO settings(guild) VALUES(id_decode($1));", guild_hid)
-
-        return guild_hid
-
-    @staticmethod
-    async def get_guild_hid(
-            *,
-            cursor: Connection,
-            guild_id: int
-    ) -> RT_STR:
-        values: DB_STR = await cursor.fetchrow("SELECT id_encode(id) FROM guilds WHERE guild_id = $1;", guild_id)
-        guild_hid, *_ = Database.save_unpack(values)
+        await cursor.execute("INSERT INTO settings(\"guild\") VALUES($1);", _guild_hid)
 
         return guild_hid
 
-    @staticmethod
-    async def get_guild_id(
-            *,
-            cursor: Connection,
-            guild_hid: str
-    ) -> RT_INT:
-        values: DB_INT = await cursor.fetchrow("SELECT guild FROM guilds WHERE id = id_decode($1);", guild_hid)
+    async def get_guild_hid(self, cursor: Connection, /, guild_id: int) -> RT_STR:
+        values: DB_STR = await cursor.fetchrow("SELECT \"id\" FROM guilds WHERE \"guild_id\" = $1;", guild_id)
+        _guild_hid, *_ = Database.save_unpack(values)
+        guild_hid = self._guild_hashids.encode(_guild_hid)
+
+        return guild_hid
+
+    async def get_guild_id(self, cursor: Connection, /, guild_hid: str) -> RT_INT:
+        _guild_hid = Database.save_unpack(self._guild_hashids.decode(guild_hid))
+        values: DB_INT = await cursor.fetchrow("SELECT \"guild\" FROM guilds WHERE \"id\" = $1;", guild_hid)
         guild_id, *_ = Database.save_unpack(values)
 
         return guild_id
 
-    @staticmethod
-    async def get_guild_language(
-            *,
-            cursor: Connection,
-            guild_hid: str
-    ) -> RT_STR:
-        values: DB_STR = await cursor.fetchrow("SELECT display_language FROM settings WHERE guild = id_decode($1);", guild_hid)
+    async def get_guild_language(self, cursor: Connection, /, guild_hid: str) -> RT_STR:
+        _guild_hid = Database.save_unpack(self._guild_hashids.decode(guild_hid))
+        values: DB_STR = await cursor.fetchrow(
+            "SELECT \"display_language\" FROM settings WHERE \"guild\" = $1;",
+            _guild_hid
+        )
         display_language, *_ = Database.save_unpack(values)
 
         return display_language
 
-    @staticmethod
-    async def poll_exists(
-            *,
-            cursor: Connection,
-            poll_hid: str
-    ) -> RT_BOOL:
+    async def poll_exists(self, cursor: Connection, /, poll_hid: str) -> RT_BOOL:
+        _poll_hid = Database.save_unpack(self._poll_hashids.decode(poll_hid))
         values: DB_BOOL = await cursor.fetchrow(
-            "SELECT EXISTS(SELECT 1 FROM polls WHERE id = id_decode($1));",
-            poll_hid
+            "SELECT EXISTS(SELECT 1 FROM polls WHERE \"id\" = $1);",
+            _poll_hid
         )
 
         exists, *_ = Database.save_unpack(values)
         return exists
 
-    @staticmethod
-    async def poll_started(
-            *,
-            cursor: Connection,
-            poll_hid: str
-    ) -> RT_BOOL:
+    async def poll_started(self, cursor: Connection, /, poll_hid: str) -> RT_BOOL:
+        _poll_hid = Database.save_unpack(self._poll_hashids.decode(poll_hid))
         values: DB_BOOL = await cursor.fetchrow(
-            "SELECT started FROM polls WHERE id = $1",
-            poll_hid
+            "SELECT \"started\" FROM polls WHERE \"id\" = $1",
+            _poll_hid
         )
         started, *_ = Database.save_unpack(values)
 
         return started
 
-    @staticmethod
-    async def poll_user_voted(
-            *,
-            cursor: Connection,
-            poll_hid: str,
-            user_id: int
-    ) -> RT_BOOL:
+    async def poll_user_voted(self, cursor: Connection, /, poll_hid: str, user_id: int) -> RT_BOOL:
+        _poll_hid = Database.save_unpack(self._poll_hashids.decode(poll_hid))
         values: DB_BOOL = await cursor.fetchrow(
-            "SELECT EXISTS(SELECT 1 FROM poll_votes WHERE poll = id_decode($1) AND user = $2)",
-            poll_hid, user_id
+            "SELECT EXISTS(SELECT 1 FROM poll_votes WHERE \"poll\" = $1 AND \"user\" = $2)",
+            _poll_hid, user_id
         )
         voted, *_ = Database.save_unpack(values)
 
         return voted
 
-    @staticmethod
-    async def get_poll_title(
-            *,
-            cursor: Connection,
-            poll_hid: str
-    ) -> RT_STR:
-        values: DB_STR = await cursor.fetchrow("SELECT title FROM poll_config WHERE poll = id_decode($1)", poll_hid)
+    async def get_poll_title(self, cursor: Connection, /, poll_hid: str) -> RT_STR:
+        _poll_hid = Database.save_unpack(self._poll_hashids.decode(poll_hid))
+        values: DB_STR = await cursor.fetchrow("SELECT \"title\" FROM poll_config WHERE \"poll\" = $1", _poll_hid)
         name, *_ = Database.save_unpack(values)
 
         return name
 
-    @staticmethod
-    async def poll_vote_count(
-            *,
-            cursor: Connection,
-            poll_hid: str
-    ) -> RT_INT:
-        values: DB_INT = await cursor.fetchrow("SELECT count(id) FROM poll_votes WHERE poll = id_decode($1)", poll_hid)
+    async def poll_vote_count(self, cursor: Connection, /, poll_hid: str) -> RT_INT:
+        _poll_hid = Database.save_unpack(self._poll_hashids.decode(poll_hid))
+        values: DB_INT = await cursor.fetchrow("SELECT count(\"id\") FROM poll_votes WHERE \"poll\" = $1", _poll_hid)
         count, *_ = Database.save_unpack(values)
 
         return count
 
-    @staticmethod
-    async def poll_description(
-            *,
-            cursor: Connection,
-            poll_hid: str
-    ) -> RT_STR:
-        values: DB_STR = await cursor.fetchrow("SELECT description FROM poll_config WHERE poll = id_decode($1)", poll_hid)
+    async def poll_description(self, cursor: Connection, /, poll_hid: str) -> RT_STR:
+        _poll_hid = Database.save_unpack(self._poll_hashids.decode(poll_hid))
+        values: DB_STR = await cursor.fetchrow("SELECT \"description\" FROM poll_config WHERE \"poll\" = $1", _poll_hid)
         info, *_ = Database.save_unpack(values)
 
         return info
 
-    @staticmethod
-    async def poll_start(
-            *,
-            cursor: Connection,
-            poll_hid: str
-    ) -> None:
-        await cursor.execute("UPDATE polls SET started = TRUE WHERE id = id_decode($1)", poll_hid)
+    async def poll_start(self, cursor: Connection, /, poll_hid: str) -> None:
+        _poll_hid = Database.save_unpack(self._poll_hashids.decode(poll_hid))
+        await cursor.execute("UPDATE polls SET \"started\" = TRUE WHERE \"id\" = $1", _poll_hid)
 
-    @staticmethod
-    async def poll_stop(
-            *,
-            cursor: Connection,
-            poll_hid: str
-    ) -> None:
-        await cursor.execute("UPDATE polls SET started = FALSE WHERE id = id_decode($1)", poll_hid)
+    async def poll_stop(self, cursor: Connection, /, poll_hid: str) -> None:
+        _poll_hid = Database.save_unpack(self._poll_hashids.decode(poll_hid))
+        await cursor.execute("UPDATE polls SET \"started\" = FALSE WHERE \"id\" = $1", _poll_hid)
 
-    @staticmethod
-    async def create_poll(
-            *,
-            cursor: Connection,
-            guild_hid: str,
-            channel_id: int,
-            message_id: int,
-            poll_title: str,
-            poll_description: str
-    ) -> RT_INT:
+    async def create_poll(self, cursor: Connection, /, guild_hid: str, channel_id: int, message_id: int, poll_title: str, poll_description: str) -> RT_INT:
+        _guild_hid = Database.save_unpack(self._guild_hashids.decode(guild_hid))
         values: DB_INT = await cursor.fetchrow(
-            "INSERT INTO polls(guild) VALUES(id_decode($1)) RETURNING id_encode(id);",
-            guild_hid
+            "INSERT INTO polls(\"guild\") VALUES($1) RETURNING \"id\";",
+            _guild_hid
         )
-        poll_id, *_ = Database.save_unpack(values)
+        _poll_hid, *_ = Database.save_unpack(values)
+        poll_hid = self._guild_hashids.encode(_poll_hid)
 
         await cursor.execute(
-            "INSERT INTO poll_config(poll, channel_id, message_id, title, description) VALUES(id_decode($1), $4);",
-            poll_id, channel_id, message_id, poll_title, poll_description
+            "INSERT INTO poll_config(\"poll\", \"channel_id\", \"message_id\", \"title\", \"description\") VALUES($1, $2, $3, $4, $5);",
+            _poll_hid, channel_id, message_id, poll_title, poll_description
         )
-        return poll_id
+        return poll_hid
 
-    @staticmethod
-    async def get_poll_guild(
-            *,
-            cursor: Connection,
-            poll_hid: str
-    ) -> RT_STR:
-        values: DB_STR = await cursor.fetchrow("SELECT guild FROM polls WHERE id = id_decode($1)", poll_hid)
-        guild_uuid, *_ = Database.save_unpack(values)
+    async def get_poll_guild(self, cursor: Connection, /, poll_hid: str) -> RT_STR:
+        _poll_hid = Database.save_unpack(self._poll_hashids.decode(poll_hid))
+        values: DB_STR = await cursor.fetchrow(
+            "SELECT \"guild_id\" FROM polls AS \"poll\" WHERE \"id\" = $1 JOIN guilds AS \"guild\" ON \"poll\".\"guild\" = \"guild\".\"id\"",
+            _poll_hid
+        )
+        _guild_hid, *_ = Database.save_unpack(values)
 
-        return guild_uuid
+        return _guild_hid
 
-    @staticmethod
-    async def get_poll_channel(
-            *,
-            cursor: Connection,
-            poll_hid: str
-    ) -> RT_INT:
-        values: DB_INT = await cursor.fetchrow("SELECT channel_id FROM polls WHERE id = id_decode($1)", poll_hid)
+    async def get_poll_channel(self, cursor: Connection, /, poll_hid: str) -> RT_INT:
+        _poll_hid = Database.save_unpack(self._poll_hashids.decode(poll_hid))
+        values: DB_INT = await cursor.fetchrow("SELECT \"channel_id\" FROM polls WHERE \"id\" = $1", _poll_hid)
         channel_id, *_ = Database.save_unpack(values)
 
         return channel_id
 
-    @staticmethod
-    async def get_poll_options(
-            *,
-            cursor: Connection,
-            poll_hid: str
-    ) -> Optional[List[Tuple[int, ]]]:
-        options: List[Tuple[int, ]] = await cursor.fetch(
-            "SELECT id FROM poll_options WHERE poll = id_decode($1)", poll_hid
+    async def get_poll_options(self, cursor: Connection, /, poll_hid: str) -> RT_LIST[int]:
+        _poll_hid = Database.save_unpack(self._poll_hashids.decode(poll_hid))
+        options: DB_LIST[Tuple[int, ]] = await cursor.fetch(
+            "SELECT \"id\" FROM poll_options WHERE \"poll\" = $1",
+            _poll_hid
         )
-        return options
 
-    @staticmethod
-    async def get_poll_message(
-            *,
-            cursor: Connection,
-            poll_hid: str
-    ) -> RT_INT:
-        values: DB_INT = await cursor.fetchrow("SELECT message_id FROM polls WHERE id = id_decode($1)", poll_hid)
+        return [option for option, in options]
+
+    async def get_poll_message(self, cursor: Connection, /, poll_hid: str) -> RT_INT:
+        _poll_hid = Database.save_unpack(self._poll_hashids.decode(poll_hid))
+        values: DB_INT = await cursor.fetchrow("SELECT \"message\" FROM polls WHERE \"id\" = $1", _poll_hid)
         message_id, *_ = Database.save_unpack(values)
 
         return message_id
 
-    @staticmethod
-    async def delete_poll(
-            *,
-            cursor: Connection,
-            poll_hid: str
-    ) -> None:
-        await cursor.execute("DELETE FROM polls WHERE id = id_decode($1)", poll_hid)
+    async def delete_poll(self, cursor: Connection, /, poll_hid: str) -> None:
+        _poll_hid = Database.save_unpack(self._poll_hashids.decode(poll_hid))
+        await cursor.execute("DELETE FROM polls WHERE \"id\" = $1", poll_hid)
 
-    @staticmethod
-    async def create_poll_option(
-            *,
-            cursor: Connection,
-            poll_hid: str,
-            option_name: str
-    ) -> RT_INT:
+    async def create_poll_option(self, cursor: Connection, /, poll_hid: str, option_name: str) -> RT_INT:
+        _poll_hid = Database.save_unpack(self._poll_hashids.decode(poll_hid))
         values: DB_INT = await cursor.fetchrow(
-            "INSERT INTO poll_options(poll, name) VALUES(id_decode($1), $2) RETURNING id_encode(id)",
-            poll_hid, option_name
+            "INSERT INTO poll_options(\"poll\", \"name\") VALUES($1, $2) RETURNING \"id\"",
+            _poll_hid, option_name
         )
-        poll_option_id, *_ = Database.save_unpack(values)
+        _poll_option_hid, *_ = Database.save_unpack(values)
+        poll_option_hid = self._option_hashids.encode(_poll_option_hid)
 
-        return poll_option_id
+        return poll_option_hid
 
-    @staticmethod
-    async def remove_poll_option(
-            *,
-            cursor: Connection,
-            option_hid: str
-    ) -> None:
-        await cursor.execute("DELETE FROM poll_options WHERE id = id_decode($1);", option_hid)
+    async def remove_poll_option(self, cursor: Connection, /, option_hid: str) -> None:
+        _option_hid = Database.save_unpack(self._option_hashids.decode(option_hid))
+        await cursor.execute("DELETE FROM poll_options WHERE id = $1;", _option_hid)
 
-    @staticmethod
-    async def get_poll_option_name(
-            *,
-            cursor: Connection,
-            option_hid: str
-    ) -> RT_STR:
-        values: DB_STR = await cursor.fetchrow("SELECT name FROM poll_options WHERE id = id_decode($1)", option_hid)
+    async def get_poll_option_name(self, cursor: Connection, /, option_hid: str) -> RT_STR:
+        _option_hid = Database.save_unpack(self._option_hashids.decode(option_hid))
+        values: DB_STR = await cursor.fetchrow("SELECT \"name\" FROM poll_options WHERE \"id\" = $1", _option_hid)
         option_name, *_ = Database.save_unpack(values)
 
         return option_name
 
-    @staticmethod
-    async def get_max_poll_option_name(
-            *,
-            cursor: Connection,
-            poll_hid: str
-    ) -> RT_INT:
+    async def get_max_poll_option_name(self, cursor: Connection, /, poll_hid: str) -> RT_INT:
+        _poll_hid = Database.save_unpack(self._poll_hashids.decode(poll_hid))
         values: DB_INT = await cursor.fetchrow(
-            "SELECT length(name) FROM poll_options WHERE poll = id_decode($1) ORDER BY length(name) DESC LIMIT 1",
-            poll_hid
+            "SELECT length(\"name\") FROM poll_options WHERE \"poll\" = $1 ORDER BY length(\"name\") DESC LIMIT 1",
+            _poll_hid
         )
-        l, *_ = Database.save_unpack(values)
+        max_length, *_ = Database.save_unpack(values)
 
-        return l
+        return max_length
 
-    @staticmethod
-    async def get_poll_option_vote_percentage(
-            *,
-            cursor: Connection,
-            poll_hid: str,
-            option_hid: str
-    ) -> RT_FLOAT:
+    async def get_poll_option_vote_percentage(self, cursor: Connection, /, poll_hid: str, option_hid: str) -> RT_FLOAT:
+        _poll_hid = Database.save_unpack(self._poll_hashids.decode(poll_hid))
+        _option_hid = Database.save_unpack(self._option_hashids.decode(option_hid))
+
         values: DB_FLOAT = await cursor.fetchrow(
             """
 SELECT (
-    CASE (SELECT count(id) FROM poll_votes WHERE poll = id_decode($1))
+    CASE (SELECT count(\"id\") FROM poll_votes WHERE \"poll\" = $1)
         WHEN 0 THEN 0
         ELSE round(
             (
                 cast(
                     (
-                        SELECT count(id)
+                        SELECT count(\"id\")
                         FROM poll_votes
-                        WHERE option = id_decode($2)
+                        WHERE \"option\" = $2
                     ) AS numeric
                 ) / cast(
                     (
-                        SELECT count(id)
-                        FROM poll_votes AS vote
-                        WHERE poll = id_decode($1)
-                        JOIN poll_options AS option ON option.id = vote.option
-                        JOIN polls AS poll ON poll.id = option.poll
+                        SELECT count(\"id\")
+                        FROM poll_votes AS \"vote\"
+                        WHERE \"poll\" = $1
+                        JOIN poll_options AS \"option\" ON \"option\".\"id\" = \"vote\".\"option\"
+                        JOIN polls AS \"poll\" ON \"poll\".\"id\" = \"option\".\"poll\"
                     ) AS numeric
                 )
             )*100,
@@ -394,37 +318,30 @@ SELECT (
         )
     END
 );""",
-            poll_hid, option_hid
+            _poll_hid, _option_hid
         )
-        vp, *_ = Database.save_unpack(values)
+        percentage, *_ = Database.save_unpack(values)
 
-        return vp
+        return percentage
 
-    @staticmethod
-    async def poll_option_exists(
-            *,
-            cursor: Connection,
-            guild_hid: str,
-            option_hid: str
-    ) -> RT_BOOL:
+    async def poll_option_exists(self, cursor: Connection, /, guild_hid: str, option_hid: str) -> RT_BOOL:
+        _guild_hid = Database.save_unpack(self._guild_hashids.decode(guild_hid))
+        _option_hid = Database.save_unpack(self._option_hashids.decode(option_hid))
+
         values: DB_BOOL = await cursor.fetchrow(
-            "SELECT EXISTS(SELECT 1 FROM poll_options WHERE poll.guild = id_decode($1) AND poll_options.id = id_decode($2) JOIN polls AS poll on poll_options.poll = poll.id)",
-            guild_hid, option_hid
+            "SELECT EXISTS(SELECT 1 FROM poll_options AS \"option\" WHERE \"poll\".\"guild\" = $1 AND \"option\".\"id\" = $2 JOIN polls AS \"poll\" on \"option\".\"poll\" = \"poll\".\"id\")",
+            _guild_hid, _option_hid
         )
         option_exists, *_ = Database.save_unpack(values)
 
         return option_exists
 
-    @staticmethod
-    async def get_option_poll(
-            *,
-            cursor: Connection,
-            option_hid: str
-    ) -> RT_INT:
+    async def get_option_poll(self, cursor: Connection, /, option_hid: str) -> RT_INT:
+        _option_hid = Database.save_unpack(self._option_hashids.decode(option_hid))
         values: DB_INT = await cursor.fetchrow(
-            "SELECT poll.id FROM poll_options WHERE poll_options.id = id_decode($1) JOIN polls AS poll on poll_options.poll = poll.id",
-            option_hid
+            "SELECT \"poll\".\"id\" FROM poll_options AS \"option\" WHERE \"option\".\"id\" = $1 JOIN polls AS \"poll\" on \"options\".\"poll\" = \"poll\".\"id\"",
+            _option_hid
         )
-        poll_id, *_ = Database.save_unpack(values)
+        poll_hid, *_ = Database.save_unpack(values)
 
-        return poll_id
+        return poll_hid
