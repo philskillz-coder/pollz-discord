@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from discord.ext.commands import Cog
 
+from imp.better.logger import BetterLogger
 from imp.data.colors import Colors
 from datetime import datetime
 
@@ -10,7 +11,7 @@ if TYPE_CHECKING:
     from imp.better.bot import BetterBot
 
 
-class BetterCog(Cog):
+class BetterCog(Cog, BetterLogger):
     def __init__(self, client: BetterBot):
         self.client = client
         self.name = "COG-"+self.qualified_name
@@ -20,12 +21,3 @@ class BetterCog(Cog):
 
     async def cog_unload(self) -> None:
         self.log("cog_unload", "Unloaded", Colors.Y)
-
-    def log(self, agent: str, message: str, color: str = Colors.GREEN):
-        print(
-            "%s%s[%s%s%s%s%s]%s %s[%s%s%s%s@%s%s%s%s]%s ~ %s%s%s" % (
-                Colors.E, Colors.BOLD, Colors.E, Colors.B, datetime.now(), Colors.E, Colors.BOLD, Colors.E,
-                Colors.BOLD, Colors.E, Colors.C, agent, Colors.E, Colors.C, self.name, Colors.E, Colors.BOLD, Colors.E,
-                color, message, Colors.E
-            )
-        )

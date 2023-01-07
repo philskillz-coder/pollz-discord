@@ -1,0 +1,14 @@
+[
+  "poll.title",
+  "poll.footer",
+  "poll.already_voted",
+  "poll.voted",
+  "poll.finished",
+  "poll.add_option.already_started",
+  "poll.add_option.success",
+  "poll.start.already_started",
+  "poll.start.success",
+  "poll.stop.not_started",
+  "poll.stop.success",
+  "poll.create.success"
+]

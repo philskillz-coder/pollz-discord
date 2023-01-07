@@ -1,0 +1,14 @@
+{
+  "poll.title": "Abstimmung \"{name}\"",
+  "poll.footer": "Abstimmungsid: {id}",
+  "poll.already_voted":  "Du hast bei dieser Abstimmung bereits deine Stimme abgegeben.",
+  "poll.voted": "Du hast für die Option `{option}` gestimmt.",
+  "poll.finished":  "Abstimmung beendet",
+  "poll.add_option.already_started": "Die Abstimmung `{id}` hat bereits gestartet. Du kannst keine Optionen mehr hinzufügen!",
+  "poll.add_option.success":  "Die Option `{option}` wurde zur Abstimmung `{id}` hinzugefügt.",
+  "poll.start.already_started": "Die Abstimmung `{id}` hat bereits gestartet.",
+  "poll.start.success":  "Die Abstimmung `{id}` wurde erfolgreich gestartet.",
+  "poll.stop.not_started": "Die Abstimmung `{id}` wurde noch nicht gestartet.",
+  "poll.stop.success": "Die Abstimmung `{id}` wurde gestoppt.",
+  "poll.create.success":  "Die Abstimmung `{id}` (`{title}`) wurde erfolgreich erstellt."
+}

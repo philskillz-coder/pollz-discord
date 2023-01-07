@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 from typing import TYPE_CHECKING
 
 import discord
@@ -8,6 +9,7 @@ from discord import app_commands, Embed
 from imp.better.cog import BetterCog
 from imp.transformers import POLL_TRANSFORMER
 from imp.views.poll import PollView
+import matplotlib.pyplot as plt
 
 if TYPE_CHECKING:
     from imp.better.bot import BetterBot
@@ -21,10 +23,10 @@ class Main(BetterCog):
         description="Create a new poll"
     )
     @app_commands.describe(
-        name="The name of the poll",
-        info="Some info for the poll"
+        title="The name of the poll",
+        description="Some info for the poll"
     )
-    async def create_poll(self, interaction: BetterInteraction, name: str, info: str = None):
+    async def create_poll(self, interaction: BetterInteraction, title: str, description: str = None):
         async with self.client.pool.acquire() as cursor:
             guild_hid = await self.client.database.get_guild_hid(
                 cursor,
@@ -34,17 +36,17 @@ class Main(BetterCog):
             message = await interaction.channel.send(
                 embed=Embed(
                     title=await self.client.translator.translate(
-                        cursor=cursor,
+                        cursor,
                         guild=guild_hid,
                         key="poll.title",
-                        name=name.upper()
+                        name=title.upper()
                     ),
-                    description=f"```\n{info}```",
+                    description=f"```\n{description}```",
                     colour=discord.Colour.yellow()
                 )
                 .set_footer(
                     text=await self.client.translator.translate(
-                        cursor=cursor,
+                        cursor,
                         guild=guild_hid,
                         key="poll.footer",
                         id="#~"
@@ -57,8 +59,8 @@ class Main(BetterCog):
                 guild_hid=guild_hid,
                 channel_id=message.channel.id,
                 message_id=message.id,
-                poll_title=name.upper(),
-                poll_description=info
+                poll_title=title.upper(),
+                poll_description=description
             )
             poll = self.client.manager.get_poll(poll_id)
             view = await PollView(poll).run(cursor)
@@ -69,7 +71,7 @@ class Main(BetterCog):
             await message.edit(
                 embed=(message.embeds[0].set_footer(
                     text=await self.client.translator.translate(
-                        cursor=cursor,
+                        cursor,
                         guild=guild_hid,
                         key="poll.footer",
                         id=poll.poll_hid
@@ -80,10 +82,10 @@ class Main(BetterCog):
 
             return await interaction.response.send_message(
                 content=await self.client.translator.translate(
-                    cursor=cursor,
+                    cursor,
                     guild=interaction.guild,
-                    key="main.create_poll.response.success",
-                    name=name,
+                    key="poll.create.success",
+                    title=title,
                     id=poll.poll_hid
                 ),
                 ephemeral=True
@@ -113,9 +115,10 @@ class Main(BetterCog):
             if await poll.started(cursor):
                 return await interaction.response.send_message(
                     content=await self.client.translator.translate(
-                        cursor=cursor,
+                        cursor,
                         guild=guild_uuid,
-                        key="main.add_option.response.poll_started"  # TODO: create translation
+                        key="poll.add_option.already_started",
+                        id=poll.poll_hid
                     ),
                     ephemeral=True
                 )
@@ -126,9 +129,11 @@ class Main(BetterCog):
 
             await interaction.response.send_message(
                 content=await self.client.translator.translate(
-                    cursor=cursor,
+                    cursor,
                     guild=guild_uuid,
-                    key="main.add_option.response.success"  # TODO: Create translation
+                    key="poll.add_option.success",
+                    id=poll.poll_hid,
+                    option=name
                 ),
                 ephemeral=True
             )
@@ -154,9 +159,10 @@ class Main(BetterCog):
             if await poll.started(cursor):
                 return await interaction.response.send_message(
                     content=await self.client.translator.translate(
-                        cursor=cursor,
+                        cursor,
                         guild=guild_uuid,
-                        key="main.start_poll.response.started"
+                        key="poll.start.already_started",
+                        id=poll.poll_hid
                     ),
                     ephemeral=True
                 )
@@ -166,9 +172,9 @@ class Main(BetterCog):
 
             await interaction.response.send_message(
                 content=await self.client.translator.translate(
-                    cursor=cursor,
+                    cursor,
                     guild=guild_uuid,
-                    key="main.start_poll.response.success",
+                    key="poll.start.success",
                     id=poll.poll_hid
                 ),
                 ephemeral=True
@@ -194,9 +200,10 @@ class Main(BetterCog):
             if not (await poll.started(cursor)):
                 return await interaction.response.send_message(
                     content=await self.client.translator.translate(
-                        cursor=cursor,
+                        cursor,
                         guild=guild_uuid,
-                        key="main.stop_poll.response.not_started"
+                        key="poll.stop.not_started",
+                        id=poll.poll_hid
                     ),
                     ephemeral=True
                 )
@@ -206,13 +213,64 @@ class Main(BetterCog):
 
             await interaction.response.send_message(
                 content=await self.client.translator.translate(
-                    cursor=cursor,
+                    cursor,
                     guild=guild_uuid,
-                    key="main.stop_poll.response.success",
+                    key="poll.stop.success",
                     id=poll.poll_hid
                 ),
                 ephemeral=True
             )
+
+    @app_commands.command(
+        name="stats",
+        description="Get the statistics of a poll"
+    )
+    @app_commands.describe(
+        poll="The poll of which you want to get the statistics"
+    )
+    async def get_stats(
+            self,
+            interaction: BetterInteraction,
+            poll: POLL_TRANSFORMER
+    ):
+        async with self.client.pool.acquire() as cursor:
+            _labels = await self.client.database.get_poll_options(
+                cursor,
+                poll_hid=poll.poll_hid
+            )
+            labels = [
+                await self.client.database.get_poll_option_name(
+                    cursor,
+                    option_hid
+                ) for option_hid in _labels
+            ]
+            sizes = [
+                await self.client.database.get_option_vote_percentage(
+                    cursor,
+                    poll_hid=poll.poll_hid,
+                    option_hid=option_hid
+                ) for option_hid in _labels
+            ]
+
+        fig1, ax1 = plt.subplots()
+        ax1.pie(sizes, labels=labels, autopct='%1.1f%%', shadow=True, startangle=90)
+        ax1.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
+
+        buf = io.BytesIO()
+        plt.savefig(buf, format="png")
+        plt.close()
+        buf.seek(0)
+
+        file = discord.File(buf, filename="stats.png")
+        buf.close()
+
+        await interaction.response.send_message(
+            file=file,
+            ephemeral=True
+        )
+
+        file.close()
+
 
     # @app_commands.command(
     #     name="vote",

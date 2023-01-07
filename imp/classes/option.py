@@ -24,7 +24,7 @@ class PollOption:
         )
 
     async def vote_percentage(self, cursor: Connection) -> Optional[float]:
-        return await self.poll.client.database.get_poll_option_vote_percentage(
+        return await self.poll.client.database.get_option_vote_percentage(
             cursor,
             poll_hid=self.poll.poll_hid,
             option_hid=self.option_hid

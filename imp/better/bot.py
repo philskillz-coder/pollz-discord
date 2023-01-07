@@ -4,13 +4,13 @@ from discord.ext.commands import Bot
 from asyncpg import Pool, create_pool
 from hashids import Hashids
 from imp.data import config
-from imp.data.colors import Colors
 from imp.database import database
 from imp.translation.translator import Translator
 from imp.classes import PollManager
+from imp.better.logger import BetterLogger
 
 
-class BetterBot(Bot):
+class BetterBot(Bot, BetterLogger):
     pool: Pool
     config = config
     database: database.Database
@@ -41,16 +41,7 @@ class BetterBot(Bot):
         )
 
     async def init_translator(self):
-        self.translator = Translator(self)
+        self.translator = await Translator.load(self, "imp/translation/data")
 
     async def init_manager(self):
         self.manager = PollManager(self)
-
-    def log(self, agent: str, message: str, color: str = Colors.GREEN):
-        print(
-            "%s%s[%s%s%s%s%s]%s %s[%s%s%s%s@%s%s%s%s]%s ~ %s%s%s" % (
-                Colors.E, Colors.BOLD, Colors.E, Colors.B, datetime.now(), Colors.E, Colors.BOLD, Colors.E,
-                Colors.BOLD, Colors.E, Colors.C, agent, Colors.E, Colors.C, self.__class__.__name__, Colors.E,
-                Colors.BOLD, Colors.E, color, message, Colors.E
-            )
-        )

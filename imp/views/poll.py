@@ -34,7 +34,8 @@ class PollOptionButton(ui.Button):
                         cursor,
                         guild=interaction.guild,
                         key="poll.already_voted"
-                    )
+                    ),
+                    ephemeral=True
                 )
 
             await interaction.response.send_message(
@@ -73,7 +74,12 @@ class PollStartButton(ui.Button):
             )
             await self.poll.update(cursor)
             await interaction.response.send_message(
-                content="Started poll %s" % self.poll.poll_hid,
+                content=await self.poll.client.translator.translate(
+                    cursor,
+                    guild=interaction.guild,
+                    key="poll.start.success",
+                    id=self.poll.poll_hid
+                ),
                 ephemeral=True
             )
             await self.view.press_start(cursor)
@@ -92,7 +98,12 @@ class PollStopButton(ui.Button):
         async with interaction.client.pool.acquire() as cursor:
             await self.poll.stop(cursor)
             await interaction.response.send_message(
-                content="Stopped poll %s" % self.poll.poll_hid,
+                content=await self.poll.client.translator.translate(
+                    cursor,
+                    guild=interaction.guild,
+                    key="poll.stop.success",
+                    id=self.poll.poll_hid
+                ),
                 ephemeral=True
             )
 

@@ -35,7 +35,7 @@ CREATE TABLE guilds (
 
 CREATE TABLE guild_settings (
     "guild" BIGINT PRIMARY KEY NOT NULL UNIQUE,
-    "display_language" VARCHAR(2) NOT NULL DEFAULT 'en',
+    "display_language" VARCHAR(5) NOT NULL DEFAULT 'de-de',
      
     CONSTRAINT fk_guild FOREIGN KEY("guild") REFERENCES guilds("id") ON DELETE CASCADE
 );
@@ -119,7 +119,7 @@ class Database:
         _guild_hid, *_ = Database.save_unpack(values)
         guild_hid = self._guild_hashids.encode(_guild_hid)
 
-        await cursor.execute("INSERT INTO settings(\"guild\") VALUES($1);", _guild_hid)
+        await cursor.execute("INSERT INTO guild_settings(\"guild\") VALUES($1);", _guild_hid)
 
         return guild_hid
 
@@ -140,7 +140,7 @@ class Database:
     async def get_guild_language(self, cursor: Connection, /, guild_hid: str) -> RT_STR:
         _guild_hid, *_ = Database.save_unpack(self._guild_hashids.decode(guild_hid))
         values: DB_STR = await cursor.fetchrow(
-            "SELECT \"display_language\" FROM settings WHERE \"guild\" = $1;",
+            "SELECT \"display_language\" FROM guild_settings WHERE \"guild\" = $1;",
             _guild_hid
         )
         display_language, *_ = Database.save_unpack(values)
@@ -293,7 +293,7 @@ class Database:
 
         return max_length
 
-    async def get_poll_option_vote_percentage(self, cursor: Connection, /, poll_hid: str, option_hid: str) -> RT_FLOAT:
+    async def get_option_vote_percentage(self, cursor: Connection, /, poll_hid: str, option_hid: str) -> RT_FLOAT:
         _poll_hid, *_ = Database.save_unpack(self._poll_hashids.decode(poll_hid))
         _option_hid, *_ = Database.save_unpack(self._option_hashids.decode(option_hid))
 

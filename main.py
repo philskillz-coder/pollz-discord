@@ -25,6 +25,7 @@ class Bot(BetterBot):
     async def sync(self):
         for guild in self.config.GUILD_IDS:
             await self.tree.sync(guild=guild)
+            # await self.tree.sync()
 
     async def prepare_polls(self):
         async with self.pool.acquire() as cursor:

@@ -164,13 +164,13 @@ class Poll:
         poll_votes = f"**Total Votes**: {await self.total_votes(cursor)}"
 
         title_translation = await self.client.translator.translate(
-            cursor=cursor,
+            cursor,
             guild=await self.guild(cursor),
             key="poll.title",
             name=(await self.title(cursor)).upper()
         )
         finished_translation = await self.client.translator.translate(
-            cursor=cursor,
+            cursor,
             guild=await self.guild(cursor),
             key='poll.finished'
         )
@@ -181,7 +181,7 @@ class Poll:
         )
         embed.set_footer(
             text=await self.client.translator.translate(
-                cursor=cursor,
+                cursor,
                 guild=await self.guild(cursor),
                 key="poll.footer",
                 id=self.poll_hid
@@ -233,7 +233,7 @@ class Poll:
         poll_votes = f"**Total Votes**: {await self.total_votes(cursor)}"
 
         title_translation = await self.client.translator.translate(
-            cursor=cursor,
+            cursor,
             guild=await self.guild(cursor),
             key="poll.title",
             name=(await self.title(cursor)).upper()
@@ -245,7 +245,7 @@ class Poll:
         )
         embed.set_footer(
             text=await self.client.translator.translate(
-                cursor=cursor,
+                cursor,
                 guild=await self.guild(cursor),
                 key="poll.footer",
                 id=self.poll_hid
