@@ -1,13 +1,13 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+import discord
 from discord import app_commands, Embed
 
 from imp.better.cog import BetterCog
-from imp.classes.vote import PollVote
+from imp.transformers import POLL_TRANSFORMER
 from imp.views.poll import PollView
-from imp.transformers import POLL_TRANSFORMER, OPTION_TRANSFORMER
-
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from imp.better.bot import BetterBot
@@ -39,7 +39,8 @@ class Main(BetterCog):
                         key="poll.title",
                         name=name.upper()
                     ),
-                    description=f"```\n{info}```"
+                    description=f"```\n{info}```",
+                    colour=discord.Colour.yellow()
                 )
                 .set_footer(
                     text=await self.client.translator.translate(
@@ -60,7 +61,7 @@ class Main(BetterCog):
                 poll_description=info
             )
             poll = self.client.manager.get_poll(poll_id)
-            view = await PollView(self.client, poll).run(cursor)
+            view = await PollView(poll).run(cursor)
             poll.set_view(view)
 
             self.client.manager.set_poll(poll)
@@ -93,16 +94,14 @@ class Main(BetterCog):
         description="Add a option to a poll"
     )
     @app_commands.describe(
-        poll="The poll to wich the option should be added",
-        name="The option name",
-        info="The option description"
+        poll="The poll to which the option should be added",
+        name="The option name"
     )
     async def add_option(
             self,
             interaction: BetterInteraction,
             poll: POLL_TRANSFORMER,
-            name: str,
-            info: str = None
+            name: str
     ):
         # TODO: check if poll option exists
         async with self.client.pool.acquire() as cursor:
@@ -120,7 +119,7 @@ class Main(BetterCog):
                     ),
                     ephemeral=True
                 )
-            opt_id = await poll.add_option(cursor, name, info)
+            await poll.add_option(cursor, name)
 
             await poll.update(cursor)
             self.client.manager.set_poll(poll)
@@ -202,7 +201,7 @@ class Main(BetterCog):
                     ephemeral=True
                 )
 
-            await poll.stop()
+            await poll.stop(cursor)
             self.client.manager.set_poll(poll)
 
             await interaction.response.send_message(
@@ -215,59 +214,70 @@ class Main(BetterCog):
                 ephemeral=True
             )
 
-    @app_commands.command(
-        name="vote",
-        description="vote for a poll"
-    )
-    async def vote(
-            self,
-            interaction: BetterInteraction,
-            poll: POLL_TRANSFORMER,
-            option: OPTION_TRANSFORMER
-    ):
-        async with self.client.pool.acquire() as cursor:
-            guild_uuid = await interaction.client.database.get_guild_hid(
-                cursor,
-                guild_id=interaction.guild.id
-            )
-
-            if not await poll.started(cursor):
-                return await interaction.response.send_message(
-                    content=await self.client.translator.translate(
-                        cursor=cursor,
-                        guild=guild_uuid,
-                        key="main.vote.response.not_started"
-                    )
-                )
-
-            if await poll.user_voted(cursor, interaction.user.id):
-                # if await poll.has_flag(cursor, 1):
-                #     translation = await self.client.translator.translate(
-                #         cursor=cursor,
-                #         guild=guild_uuid,
-                #         key="main.vote.response.voted.reconsider"
-                #     )
-                # else:
-                #     translation = await self.client.translator.translate(
-                #         cursor=cursor,
-                #         guild=guild_uuid,
-                #         key="main.vote.response.voted.no_reconsider"
-                #     )
-                translation = "<TRANSLATION:main.vote.response.voted.no_reconsider>"
-
-                return await interaction.response.send_message(
-                    content=translation,
-                    ephemeral=True
-                )
-
-            vote = PollVote(interaction.user.id, poll.poll_hid, option.option_hid)
-            _id = await poll.add_vote(cursor, vote)
-            await poll.update(cursor)
-            self.client.manager.set_poll(poll)
-
-            await interaction.response.send_message(
-                content=self.client.option_hashids.encode(_id)
-            )
+    # @app_commands.command(
+    #     name="vote",
+    #     description="vote for a poll"
+    # )
+    # async def vote(
+    #         self,
+    #         interaction: BetterInteraction,
+    #         poll: POLL_TRANSFORMER,
+    #         option: OPTION_TRANSFORMER
+    # ):
+    #     async with self.client.pool.acquire() as cursor:
+    #         guild_hid = await interaction.client.database.get_guild_hid(
+    #             cursor,
+    #             guild_id=interaction.guild.id
+    #         )
+    #
+    #         if not await poll.started(cursor):
+    #             return await interaction.response.send_message(
+    #                 content=await self.client.translator.translate(
+    #                     cursor=cursor,
+    #                     guild=guild_hid,
+    #                     key="main.vote.response.not_started"
+    #                 )
+    #             )
+    #
+    #         if await poll.user_voted(cursor, interaction.user.id):
+    #             # if await poll.has_flag(cursor, 1):
+    #             #     translation = await self.client.translator.translate(
+    #             #         cursor=cursor,
+    #             #         guild=guild_uuid,
+    #             #         key="main.vote.response.voted.reconsider"
+    #             #     )
+    #             # else:
+    #             #     translation = await self.client.translator.translate(
+    #             #         cursor=cursor,
+    #             #         guild=guild_uuid,
+    #             #         key="main.vote.response.voted.no_reconsider"
+    #             #     )
+    #             translation = "<TRANSLATION:main.vote.response.voted.no_reconsider>"
+    #
+    #             return await interaction.response.send_message(
+    #                 content=translation,
+    #                 ephemeral=True
+    #             )
+    #
+    #         await interaction.response.send_message(
+    #             content=await poll.client.translator.translate(
+    #                 cursor,
+    #                 guild=interaction.guild,
+    #                 key="poll.voted",
+    #                 option=await option.name(cursor)
+    #             ),
+    #             ephemeral=True
+    #         )
+    #
+    #         await option.poll.add_vote(
+    #             cursor,
+    #             PollVote(interaction.user.id, option.poll.poll_hid, option.option_hid)
+    #         )
+    #         # self.client.manager.set_poll(poll)
+    #
+    #         await asyncio.sleep(poll.UPDATE_TIME)
+    #         if poll.update_ready():
+    #             await poll.update(cursor)
 
 
 async def setup(client: BetterBot):

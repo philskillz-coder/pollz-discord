@@ -4,6 +4,7 @@ from imp.data.config import POOL
 
 from typing import List, Tuple
 
+
 async def main():
     cursor = await connect(**POOL)
     done = False
@@ -38,6 +39,10 @@ async def main():
                 finished = True
 
             else:
-                await cursor.execute("INSERT INTO translations(language, code, translation) VALUES ($1, $2, $3)", l_id, key_id, translation)
+                await cursor.execute(
+                    "INSERT INTO translations(language, code, translation) VALUES ($1, $2, $3)",
+                    l_id, key_id, translation
+                )
+
 
 asyncio.run(main())

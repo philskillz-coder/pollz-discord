@@ -15,9 +15,8 @@ class BetterCheck:
         self.callback = callback
 
     async def __call__(self, interaction: BetterInteraction):
-        res = None
         try:
-            res = await self.callback(interaction)
+            return await self.callback(interaction)
 
         except errors.BetterCheckException as e:
             await interaction.response.send_message(
@@ -25,7 +24,7 @@ class BetterCheck:
                 ephemeral=True
             )
 
-            raise errors.HandeledCheckException(e, message="%s check failed" % self.name)
+            raise errors.HandledCheckException(e, message="%s check failed" % self.name)
 
 
 def better_check(name: str):

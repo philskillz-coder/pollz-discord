@@ -16,31 +16,21 @@ if TYPE_CHECKING:
 class Option_Transformer(app_commands.Transformer, ABC):
     @classmethod
     async def transform(cls, interaction: BetterInteraction, value: str) -> PollOption:
-        raw_code = interaction.client.hash_mgr.decode(value)
-        if not raw_code:
-            raise TransformerException(f"`{value}` is not a option id!")
-
-        code, *_ = raw_code
-
         async with interaction.client.pool.acquire() as cursor:
-            guild_uuid = await interaction.client.database.get_guild_hid(
-                cursor,
-                guild_id=interaction.guild.id
-            )
             exists = await interaction.client.database.poll_option_exists(
                 cursor,
-                guild_hid=guild_uuid,
-                option_hid=code
+                option_hid=value
             )
 
             if not exists:
-                raise TransformerException(f"A poll option with the id `{code}` does not exist!")
+                raise TransformerException(f"A poll option with the id `{value}` does not exist!")
 
             poll_hid = await interaction.client.database.get_option_poll(
                 cursor,
-                option_hid=code
+                option_hid=value
             )
-            return await (interaction.client.manager.get_poll(poll_hid)).get_option(cursor, code)
+
+            return await (interaction.client.manager.get_poll(poll_hid)).get_option(cursor, value)
 
     @classmethod
     async def autocomplete(cls, interaction: BetterInteraction, value: str) -> List[app_commands.Choice[str]]:
@@ -51,17 +41,18 @@ class Option_Transformer(app_commands.Transformer, ABC):
             if _poll_hid is None:
                 return []
 
-            raw_ids: List[Tuple[int, str]] = await cursor.fetch(
+            # noinspection SpellCheckingInspection
+            _option_hids: List[Tuple[int, str]] = await cursor.fetch(
                 "SELECT id, name FROM poll_options WHERE poll = $1",
                 _poll_hid
             )
 
-        value = value.upper()
+        value = value.lower()
 
         choices: List[app_commands.Choice] = []
-        for raw_id, name in raw_ids:
-            clean_id = interaction.client.option_hashids.encode(raw_id)
-            if clean_id.startswith(value) or name.startswith(value):
-                choices.append(app_commands.Choice(name=f"{clean_id} | {name}", value=clean_id))
+        for _option_hid, name in _option_hids:
+            option_hid = interaction.client.option_hashids.encode(_option_hid)
+            if option_hid.lower().startswith(value) or name.lower().startswith(value):
+                choices.append(app_commands.Choice(name=f"{option_hid} ({name})", value=option_hid))
 
         return choices

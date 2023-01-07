@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING
 
 import discord
 from asyncpg import Connection
 
 if TYPE_CHECKING:
     from imp.better.bot import BetterBot
+
 
 class Translator:
     DEFAULT_LANGUAGE = "34ac8b6b-40d5-49cd-a045-c417c8d90037"
@@ -17,7 +18,7 @@ class Translator:
     async def __call__(self, cursor: Connection, guild: discord.Guild, key: str, **format_args):
         return await self.translate(cursor, guild, key, **format_args)
 
-    async def translate(self, cursor, guild, key: str, **kwargs):
+    async def translate(self, *_, key: str, **kwargs):
         return f"<TRANSLATION:{key}#{kwargs}>"
 
     #

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 from typing import TYPE_CHECKING, Optional, Dict
 
 import discord
@@ -14,7 +15,10 @@ if TYPE_CHECKING:
     from imp.better.bot import BetterBot
 
 
+# noinspection PyTypeChecker
 class Poll:
+    UPDATE_TIME = 10
+
     def __init__(self, client: BetterBot, poll_hid: str):
         self.client = client
         self.poll_hid = poll_hid
@@ -23,6 +27,10 @@ class Poll:
         self._channel: Optional[discord.TextChannel] = None
         self._message: Optional[discord.PartialMessage] = None
         self.view: Optional[PollView] = None
+        self._last_vote: datetime.datetime = None
+
+    def update_ready(self):
+        return (datetime.datetime.now()-self._last_vote).total_seconds() > self.UPDATE_TIME
 
     @classmethod
     async def create(cls, client: BetterBot, guild_hid: str, channel_id: int, message_id: int, poll_title: Optional[str] = None, poll_description: Optional[str] = None):
@@ -65,14 +73,14 @@ class Poll:
             poll_hid=self.poll_hid
         )
 
-    async def options(self, cursor: Connection) -> Optional[Dict[int, PollOption]]:
+    async def options(self, cursor: Connection) -> Optional[Dict[str, PollOption]]:
         options = await self.client.database.get_poll_options(
             cursor,
             poll_hid=self.poll_hid
         )
 
         return {
-            code: PollOption(self.client, self, code) for code in options
+            code: PollOption(self, code) for code in options
         }
 
     async def guild(self, cursor: Connection):
@@ -127,21 +135,70 @@ class Poll:
             poll_hid=self.poll_hid
         )
         await (await self.message(cursor)).edit(
-            view=await PollView(self.client, self).run(cursor)
+            view=await PollView(self).run(cursor)
         )
         await self.update(cursor)
 
-    async def stop(self):
-        pass
+    async def stop(self, cursor: Connection):
+        await self.view.press_stop()
+        await self.client.database.poll_stop(
+            cursor,
+            poll_hid=self.poll_hid
+        )
 
-    async def delete(self):
-        async with self.client.pool.acquire() as cursor:
-            await self.client.database.delete_poll(
-                cursor,
-                poll_hid=self.poll_hid
+        options = await self.options(cursor)
+        max_opt = await self.client.database.get_max_poll_option_name(
+            cursor,
+            poll_hid=self.poll_hid
+        )
+
+        raw_options = []
+        for opt in options.values():
+            v = f"(`{opt.option_hid}`) **{await opt.name(cursor)}**:{(max_opt - len(await opt.name(cursor))) * ' '} {await opt.vote_percentage(cursor)}%"
+            raw_options.append(v)
+
+        option_string = "\n".join(
+            raw_options
+        )
+        poll_info = f"```\n{await self.description(cursor)}```"
+        poll_votes = f"**Total Votes**: {await self.total_votes(cursor)}"
+
+        title_translation = await self.client.translator.translate(
+            cursor=cursor,
+            guild=await self.guild(cursor),
+            key="poll.title",
+            name=(await self.title(cursor)).upper()
+        )
+        finished_translation = await self.client.translator.translate(
+            cursor=cursor,
+            guild=await self.guild(cursor),
+            key='poll.finished'
+        )
+        embed = discord.Embed(
+            title=title_translation,
+            description=f"**{finished_translation}**\n{poll_info}{poll_votes}\n{option_string}",
+            colour=discord.Colour.red()
+        )
+        embed.set_footer(
+            text=await self.client.translator.translate(
+                cursor=cursor,
+                guild=await self.guild(cursor),
+                key="poll.footer",
+                id=self.poll_hid
             )
+        )
 
-    async def add_option(self, cursor: Connection, name: str, info: str = None) -> Optional[int]:
+        message = await self.message(cursor)
+        await message.edit(embed=embed, view=self.view)
+        await self.delete(cursor)
+
+    async def delete(self, cursor: Connection):
+        await self.client.database.delete_poll(
+            cursor,
+            poll_hid=self.poll_hid
+        )
+
+    async def add_option(self, cursor: Connection, name: str) -> Optional[int]:
         return await self.client.database.create_poll_option(
             cursor,
             poll_hid=self.poll_hid,
@@ -154,7 +211,7 @@ class Poll:
             option_hid=option_hid
         )
 
-    async def get_option(self, cursor: Connection, option_hid: int):
+    async def get_option(self, cursor: Connection, option_hid: str):
         return (await self.options(cursor)).get(option_hid)
 
     async def update(self, cursor: Connection):
@@ -166,7 +223,7 @@ class Poll:
 
         raw_options = []
         for opt in options.values():
-            v = f"**{opt.option_hid}** {await opt.name(cursor)}:{(max_opt - len(await opt.name(cursor))) * ' '} {await opt.vote_percentage(cursor)}%"
+            v = f"(`{opt.option_hid}`) **{await opt.name(cursor)}**:{(max_opt - len(await opt.name(cursor))) * ' '} {await opt.vote_percentage(cursor)}%"
             raw_options.append(v)
 
         option_string = "\n".join(
@@ -175,17 +232,16 @@ class Poll:
         poll_info = f"```\n{await self.description(cursor)}```"
         poll_votes = f"**Total Votes**: {await self.total_votes(cursor)}"
 
-        description = f""
-        message = await self.message(cursor)
-
+        title_translation = await self.client.translator.translate(
+            cursor=cursor,
+            guild=await self.guild(cursor),
+            key="poll.title",
+            name=(await self.title(cursor)).upper()
+        )
         embed = discord.Embed(
-            title=await self.client.translator.translate(
-                cursor=cursor,
-                guild=await self.guild(cursor),
-                key="poll.title",
-                name=(await self.title(cursor)).upper()
-            ),
-            description=f"**Poll has {'' if await self.started(cursor) else 'not'} started!**\n{poll_info}{poll_votes}\n{option_string}"
+            title=title_translation,
+            description=f"{poll_info}{poll_votes}\n{option_string}",
+            colour=discord.Colour.green() if await self.started(cursor) else discord.Colour.yellow()
         )
         embed.set_footer(
             text=await self.client.translator.translate(
@@ -195,10 +251,11 @@ class Poll:
                 id=self.poll_hid
             )
         )
+        message = await self.message(cursor)
         await message.edit(embed=embed)
 
-    # noinspection PyMethodMayBeStatic
     async def add_vote(self, cursor: Connection, vote: PollVote):
+        self._last_vote = datetime.datetime.now()
         _option_hid, *_ = Database.save_unpack(self.client.option_hashids.decode(vote.option))
 
         _vote_hid, = await cursor.fetchrow(

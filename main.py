@@ -28,17 +28,21 @@ class Bot(BetterBot):
 
     async def prepare_polls(self):
         async with self.pool.acquire() as cursor:
+            # noinspection SpellCheckingInspection
             poll_hids: List[Tuple[int, ]] = await cursor.fetch("SELECT id FROM polls")
+
             for _poll_hid, in poll_hids:
                 poll = self.manager.init_poll(self.poll_hashids.encode(_poll_hid))
-                view = PollView(self, poll)
+                self.log("prepare_polls", f"Added poll: {await poll.title(cursor)}@{poll.poll_hid}")
+                view = await PollView(poll=poll).run(cursor)
                 poll.set_view(view)
 
                 self.add_view(view)
                 self.manager.set_poll(poll)
 
     async def on_ready(self):
-        print(str(self.user), "ONLINE")
+        self.log("on_ready", f"Running as {self.user}")
+        self.log("on_ready", "Online")
 
     async def setup_hook(self) -> None:
         await self.init_pool()

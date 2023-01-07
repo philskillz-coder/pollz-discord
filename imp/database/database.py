@@ -147,12 +147,11 @@ class Database:
 
         return display_language
 
-    async def poll_exists(self, cursor: Connection, /, guild_hid: str, poll_hid: str) -> RT_BOOL:
-        _guild_hid, *_ = Database.save_unpack(self._guild_hashids.decode(guild_hid))
+    async def poll_exists(self, cursor: Connection, /, poll_hid: str) -> RT_BOOL:
         _poll_hid, *_ = Database.save_unpack(self._poll_hashids.decode(poll_hid))
         values: DB_BOOL = await cursor.fetchrow(
-            "SELECT EXISTS(SELECT 1 FROM polls WHERE \"id\" = $1 AND \"guild\" = $2);",
-            _poll_hid, _guild_hid
+            "SELECT EXISTS(SELECT 1 FROM polls WHERE \"id\" = $1);",
+            _poll_hid
         )
 
         exists, *_ = Database.save_unpack(values)
@@ -171,7 +170,7 @@ class Database:
     async def poll_user_voted(self, cursor: Connection, /, poll_hid: str, user_id: int) -> RT_BOOL:
         _poll_hid, *_ = Database.save_unpack(self._poll_hashids.decode(poll_hid))
         values: DB_BOOL = await cursor.fetchrow(
-            "SELECT EXISTS(SELECT 1 FROM poll_votes WHERE \"poll\" = $1 AND \"user\" = $2)",
+            "SELECT EXISTS(SELECT 1 FROM poll_votes AS \"vote\" JOIN poll_options AS \"option\" ON \"vote\".\"option\" = \"option\".\"id\" WHERE \"option\".\"poll\" = $1 AND \"user\" = $2)",
             _poll_hid, user_id
         )
         voted, *_ = Database.save_unpack(values)
@@ -240,8 +239,6 @@ class Database:
         values: DB_INT = await cursor.fetchrow("SELECT \"channel\" FROM poll_config WHERE \"poll\" = $1", _poll_hid)
         channel_id, *_ = Database.save_unpack(values)
 
-        print(poll_hid, _poll_hid, channel_id)
-
         return channel_id
 
     async def get_poll_options(self, cursor: Connection, /, poll_hid: str) -> RT_LIST[str]:
@@ -262,7 +259,7 @@ class Database:
 
     async def delete_poll(self, cursor: Connection, /, poll_hid: str) -> None:
         _poll_hid, *_ = Database.save_unpack(self._poll_hashids.decode(poll_hid))
-        await cursor.execute("DELETE FROM polls WHERE \"id\" = $1", poll_hid)
+        await cursor.execute("DELETE FROM polls WHERE \"id\" = $1", _poll_hid)
 
     async def create_poll_option(self, cursor: Connection, /, poll_hid: str, option_name: str) -> RT_INT:
         _poll_hid, *_ = Database.save_unpack(self._poll_hashids.decode(poll_hid))
@@ -333,13 +330,12 @@ SELECT (
 
         return percentage
 
-    async def poll_option_exists(self, cursor: Connection, /, guild_hid: str, option_hid: str) -> RT_BOOL:
-        _guild_hid, *_ = Database.save_unpack(self._guild_hashids.decode(guild_hid))
+    async def poll_option_exists(self, cursor: Connection, /, option_hid: str) -> RT_BOOL:
         _option_hid, *_ = Database.save_unpack(self._option_hashids.decode(option_hid))
 
         values: DB_BOOL = await cursor.fetchrow(
-            "SELECT EXISTS(SELECT 1 FROM poll_options AS \"option\" WHERE \"poll\".\"guild\" = $1 AND \"option\".\"id\" = $2 JOIN polls AS \"poll\" on \"option\".\"poll\" = \"poll\".\"id\")",
-            _guild_hid, _option_hid
+            "SELECT EXISTS(SELECT 1 FROM poll_options AS \"option\" JOIN polls AS \"poll\" on \"option\".\"poll\" = \"poll\".\"id\" WHERE \"option\".\"id\" = $1)",
+            _option_hid
         )
         option_exists, *_ = Database.save_unpack(values)
 
@@ -348,7 +344,7 @@ SELECT (
     async def get_option_poll(self, cursor: Connection, /, option_hid: str) -> RT_STR:
         _option_hid, *_ = Database.save_unpack(self._option_hashids.decode(option_hid))
         values: DB_INT = await cursor.fetchrow(
-            "SELECT \"poll\".\"id\" FROM poll_options AS \"option\" JOIN polls AS \"poll\" on \"options\".\"poll\" = \"poll\".\"id\" WHERE \"option\".\"id\" = $1",
+            "SELECT \"poll\".\"id\" FROM poll_options AS \"option\" JOIN polls AS \"poll\" on \"option\".\"poll\" = \"poll\".\"id\" WHERE \"option\".\"id\" = $1",
             _option_hid
         )
         poll_hid, *_ = Database.save_unpack(values)

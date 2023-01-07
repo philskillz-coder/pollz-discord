@@ -5,13 +5,11 @@ from typing import TYPE_CHECKING, Optional
 from asyncpg import Connection
 
 if TYPE_CHECKING:
-    from imp.better.bot import BetterBot
     from imp.classes.poll import Poll
 
 
 class PollOption:
-    def __init__(self, client: BetterBot, poll: Poll, option_hid: str):
-        self.client = client
+    def __init__(self, poll: Poll, option_hid: str):
         self.poll = poll
         self._option_hid = option_hid
 
@@ -20,13 +18,13 @@ class PollOption:
         return self._option_hid
 
     async def name(self, cursor: Connection) -> Optional[str]:
-        return await self.client.database.get_poll_option_name(
+        return await self.poll.client.database.get_poll_option_name(
             cursor,
             option_hid=self.option_hid
         )
 
     async def vote_percentage(self, cursor: Connection) -> Optional[float]:
-        return await self.client.database.get_poll_option_vote_percentage(
+        return await self.poll.client.database.get_poll_option_vote_percentage(
             cursor,
             poll_hid=self.poll.poll_hid,
             option_hid=self.option_hid
