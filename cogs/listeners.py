@@ -15,15 +15,15 @@ class Listeners(BetterCog):
     @BetterCog.listener()
     async def on_guild_join(self, guild: Guild):
         async with self.client.pool.acquire() as cursor:
-            guild_exists = await self.client.db_mgr.guild_id_exists(
-                cursor=cursor,
+            guild_exists = await self.client.database.guild_id_exists(
+                cursor,
                 guild_id=guild.id
             )
 
             if not guild_exists:
                 self.log("on_guild_join", f"Joined guild: {guild.id} | Not exists")
-                await self.client.db_mgr.create_guild(
-                    cursor=cursor,
+                await self.client.database.create_guild(
+                    cursor,
                     guild_id=guild.id
                 )
 

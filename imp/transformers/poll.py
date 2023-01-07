@@ -5,6 +5,7 @@ from abc import ABC
 from discord import app_commands
 
 from imp.classes.poll import Poll
+from imp.database.database import Database
 from imp.errors import TransformerException
 
 from typing import TYPE_CHECKING, List, Tuple
@@ -15,44 +16,38 @@ if TYPE_CHECKING:
 class Poll_Transformer(app_commands.Transformer, ABC):
     @classmethod
     async def transform(cls, interaction: BetterInteraction, value: str) -> Poll:
-        raw_code = interaction.client.hash_mgr.decode(value)
-        if not raw_code:
-            raise TransformerException(f"`{value}` is not a poll id!")
-
-        code, *_ = raw_code
-
         async with interaction.client.pool.acquire() as cursor:
-            guild_uuid = await interaction.client.db_mgr.get_guild_uuid(
-                cursor=cursor,
+            guild_hid = await interaction.client.database.get_guild_hid(
+                cursor,
                 guild_id=interaction.guild.id
             )
-            exists = await interaction.client.db_mgr.poll_exists(
-                cursor=cursor,
-                poll_hid=code
+            exists = await interaction.client.database.poll_exists(
+                cursor,
+                guild_hid=guild_hid,
+                poll_hid=value,
             )
 
             if not exists:
-                raise TransformerException(f"A poll with the id `{code}` does not exist!")
+                raise TransformerException(f"A poll with the id `{value}` does not exist!")
 
-        return interaction.client.manager.get_poll(code)
+        return interaction.client.manager.get_poll(value)
 
     @classmethod
     async def autocomplete(cls, interaction: BetterInteraction, value: str) -> List[app_commands.Choice[str]]:
         async with interaction.client.pool.acquire() as cursor:
-            raw_ids: List[Tuple[int, str]] = await cursor.fetch(
-                "SELECT id, name FROM polls WHERE guild = $1",
-                await interaction.client.db_mgr.get_guild_uuid(
-                    cursor=cursor,
-                    guild_id=interaction.guild.id
-                )
-            )
+            guild_hid = await interaction.client.database.get_guild_hid(cursor, guild_id=interaction.guild.id)
+            _guild_hid, *_ = Database.save_unpack(interaction.client.guild_hashids.decode(guild_hid))
 
-        value = value.upper()
+            all_poll_ids: List[Tuple[int, str]] = await cursor.fetch("SELECT \"poll\".\"id\", \"config\".\"title\" FROM polls AS \"poll\" JOIN poll_config AS \"config\" ON \"config\".\"poll\" = \"poll\".\"id\" WHERE \"poll\".\"guild\" = $1", _guild_hid)
+            print(all_poll_ids, guild_hid, _guild_hid)
+        print(value)
 
+        value = value.lower()
         choices: List[app_commands.Choice] = []
-        for raw_id, name in raw_ids:
-            clean_id = interaction.client.hash_mgr.encode(raw_id)
-            if clean_id.startswith(value) or name.startswith(value):
-                choices.append(app_commands.Choice(name=f"{clean_id} | {name}", value=clean_id))
+        for _poll_hid, title in all_poll_ids:
+            print(_poll_hid, title)
+            poll_hid = interaction.client.poll_hashids.encode(_poll_hid)
+            if poll_hid.lower().startswith(value) or title.lower().startswith(value.lower()):
+                choices.append(app_commands.Choice(name=f"{poll_hid} ({title})", value=poll_hid))
 
         return choices

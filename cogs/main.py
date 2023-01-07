@@ -8,6 +8,7 @@ from imp.views.poll import PollView
 from imp.transformers import POLL_TRANSFORMER, OPTION_TRANSFORMER
 
 from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
     from imp.better.bot import BetterBot
     from imp.better.interaction import BetterInteraction
@@ -25,32 +26,16 @@ class Main(BetterCog):
     )
     async def create_poll(self, interaction: BetterInteraction, name: str, info: str = None):
         async with self.client.pool.acquire() as cursor:
-            guild_uuid = await self.client.db_mgr.get_guild_uuid(
-                cursor=cursor,
+            guild_hid = await self.client.database.get_guild_hid(
+                cursor,
                 guild_id=interaction.guild.id
             )
-
-            name_exists = await self.client.db_mgr.poll_name_exists(
-                cursor=cursor,
-                guild_hid=guild_uuid,
-                poll_name=name
-            )
-            if name_exists:
-                return await interaction.response.send_message(
-                    content=await self.client.translator.translate(
-                        cursor=cursor,
-                        guild=guild_uuid,
-                        key="main.create_poll.response.name_exists",
-                        name=name
-                    ),
-                    ephemeral=True
-                )
 
             message = await interaction.channel.send(
                 embed=Embed(
                     title=await self.client.translator.translate(
                         cursor=cursor,
-                        guild=guild_uuid,
+                        guild=guild_hid,
                         key="poll.title",
                         name=name.upper()
                     ),
@@ -59,16 +44,16 @@ class Main(BetterCog):
                 .set_footer(
                     text=await self.client.translator.translate(
                         cursor=cursor,
-                        guild=guild_uuid,
+                        guild=guild_hid,
                         key="poll.footer",
                         id="#~"
                     )
                 )
             )
 
-            poll_id = await self.client.db_mgr.create_poll(
-                cursor=cursor,
-                guild_hid=guild_uuid,
+            poll_id = await self.client.database.create_poll(
+                cursor,
+                guild_hid=guild_hid,
                 channel_id=message.channel.id,
                 message_id=message.id,
                 poll_title=name.upper(),
@@ -84,9 +69,9 @@ class Main(BetterCog):
                 embed=(message.embeds[0].set_footer(
                     text=await self.client.translator.translate(
                         cursor=cursor,
-                        guild=guild_uuid,
+                        guild=guild_hid,
                         key="poll.footer",
-                        id=poll.clean_poll_id
+                        id=poll.poll_hid
                     )
                 )),
                 view=view
@@ -98,11 +83,10 @@ class Main(BetterCog):
                     guild=interaction.guild,
                     key="main.create_poll.response.success",
                     name=name,
-                    id=poll.clean_poll_id
+                    id=poll.poll_hid
                 ),
                 ephemeral=True
             )
-
 
     @app_commands.command(
         name="add_option",
@@ -122,8 +106,8 @@ class Main(BetterCog):
     ):
         # TODO: check if poll option exists
         async with self.client.pool.acquire() as cursor:
-            guild_uuid = await self.client.db_mgr.get_guild_uuid(
-                cursor=cursor,
+            guild_uuid = await self.client.database.get_guild_hid(
+                cursor,
                 guild_id=interaction.guild.id
             )
 
@@ -136,7 +120,7 @@ class Main(BetterCog):
                     ),
                     ephemeral=True
                 )
-            opt_id = await poll.add_option(name.upper(), info)
+            opt_id = await poll.add_option(cursor, name, info)
 
             await poll.update(cursor)
             self.client.manager.set_poll(poll)
@@ -158,13 +142,13 @@ class Main(BetterCog):
         poll="The poll you want to start"
     )
     async def start_poll(
-        self,
-        interaction: BetterInteraction,
-        poll: POLL_TRANSFORMER
+            self,
+            interaction: BetterInteraction,
+            poll: POLL_TRANSFORMER
     ):
         async with self.client.pool.acquire() as cursor:
-            guild_uuid = await self.client.db_mgr.get_guild_uuid(
-                cursor=cursor,
+            guild_uuid = await self.client.database.get_guild_hid(
+                cursor,
                 guild_id=interaction.guild.id
             )
 
@@ -186,7 +170,7 @@ class Main(BetterCog):
                     cursor=cursor,
                     guild=guild_uuid,
                     key="main.start_poll.response.success",
-                    id=poll.clean_poll_id
+                    id=poll.poll_hid
                 ),
                 ephemeral=True
             )
@@ -199,13 +183,13 @@ class Main(BetterCog):
         poll="The poll you want to stop"
     )
     async def stop_poll(
-        self,
-        interaction: BetterInteraction,
-        poll: POLL_TRANSFORMER
+            self,
+            interaction: BetterInteraction,
+            poll: POLL_TRANSFORMER
     ):
         async with self.client.pool.acquire() as cursor:
-            guild_uuid = await self.client.db_mgr.get_guild_uuid(
-                cursor=cursor,
+            guild_uuid = await self.client.database.get_guild_hid(
+                cursor,
                 guild_id=interaction.guild.id
             )
             if not (await poll.started(cursor)):
@@ -226,7 +210,7 @@ class Main(BetterCog):
                     cursor=cursor,
                     guild=guild_uuid,
                     key="main.stop_poll.response.success",
-                    id=poll.clean_poll_id
+                    id=poll.poll_hid
                 ),
                 ephemeral=True
             )
@@ -236,14 +220,14 @@ class Main(BetterCog):
         description="vote for a poll"
     )
     async def vote(
-        self,
-        interaction: BetterInteraction,
-        poll: POLL_TRANSFORMER,
-        option: OPTION_TRANSFORMER
+            self,
+            interaction: BetterInteraction,
+            poll: POLL_TRANSFORMER,
+            option: OPTION_TRANSFORMER
     ):
         async with self.client.pool.acquire() as cursor:
-            guild_uuid = await interaction.client.db_mgr.get_guild_uuid(
-                cursor=cursor,
+            guild_uuid = await interaction.client.database.get_guild_hid(
+                cursor,
                 guild_id=interaction.guild.id
             )
 
@@ -257,24 +241,24 @@ class Main(BetterCog):
                 )
 
             if await poll.user_voted(cursor, interaction.user.id):
-                if await poll.has_flag(cursor, 1):
-                    translation = await self.client.translator.translate(
-                        cursor=cursor,
-                        guild=guild_uuid,
-                        key="main.vote.response.voted.reconsider"
-                    )
-                else:
-                    translation = await self.client.translator.translate(
-                        cursor=cursor,
-                        guild=guild_uuid,
-                        key="main.vote.response.voted.no_reconsider"
-                    )
+                # if await poll.has_flag(cursor, 1):
+                #     translation = await self.client.translator.translate(
+                #         cursor=cursor,
+                #         guild=guild_uuid,
+                #         key="main.vote.response.voted.reconsider"
+                #     )
+                # else:
+                #     translation = await self.client.translator.translate(
+                #         cursor=cursor,
+                #         guild=guild_uuid,
+                #         key="main.vote.response.voted.no_reconsider"
+                #     )
+                translation = "<TRANSLATION:main.vote.response.voted.no_reconsider>"
 
                 return await interaction.response.send_message(
                     content=translation,
                     ephemeral=True
                 )
-
 
             vote = PollVote(interaction.user.id, poll.poll_hid, option.option_hid)
             _id = await poll.add_vote(cursor, vote)
@@ -282,9 +266,8 @@ class Main(BetterCog):
             self.client.manager.set_poll(poll)
 
             await interaction.response.send_message(
-                content=self.client.hash_mgr.encode(_id)
+                content=self.client.option_hashids.encode(_id)
             )
-
 
 
 async def setup(client: BetterBot):

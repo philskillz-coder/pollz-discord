@@ -5,6 +5,8 @@ from imp.views.poll import PollView
 from typing import List, Tuple
 import asyncio
 
+discord.utils.setup_logging()
+
 
 class Bot(BetterBot):
     INIT_COGS = [
@@ -26,9 +28,9 @@ class Bot(BetterBot):
 
     async def prepare_polls(self):
         async with self.pool.acquire() as cursor:
-            poll_ids: List[Tuple[str, ]] = await cursor.fetch("SELECT id_encode(id) FROM polls")
-            for poll_id, in poll_ids:
-                poll = self.manager.init_poll(poll_id)
+            poll_hids: List[Tuple[int, ]] = await cursor.fetch("SELECT id FROM polls")
+            for _poll_hid, in poll_hids:
+                poll = self.manager.init_poll(self.poll_hashids.encode(_poll_hid))
                 view = PollView(self, poll)
                 poll.set_view(view)
 
@@ -41,9 +43,10 @@ class Bot(BetterBot):
     async def setup_hook(self) -> None:
         await self.init_pool()
         await self.init_hash_ids()
-        await self.init_db_mgr()
+        await self.init_database()
         await self.init_translator()
         await self.init_manager()
+        await self.init_hash_ids()
 
         await self.prepare_polls()
 
@@ -52,7 +55,7 @@ class Bot(BetterBot):
 
 
 async def main():
-    async with Bot("iv", application_id=914581317709070346, intents=discord.Intents.default()) as bot:
+    async with Bot("iv", application_id=914581317709070346, intents=discord.Intents.default(), log_handler=None) as bot:
         await bot.start(token=bot.config.TOKEN, reconnect=True)
 
 asyncio.run(main())

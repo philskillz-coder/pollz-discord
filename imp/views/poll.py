@@ -47,8 +47,8 @@ class PollStartButton(ui.Button):
 
     async def callback(self, interaction: BetterInteraction):
         async with interaction.client.pool.acquire() as cursor:
-            await interaction.client.db_mgr.poll_start(
-                cursor=cursor,
+            await interaction.client.database.poll_start(
+                cursor,
                 poll_hid=self.poll.poll_hid
             )
             await self.poll.update(cursor)
@@ -70,8 +70,8 @@ class PollStopButton(ui.Button):
 
     async def callback(self, interaction: BetterInteraction):
         async with interaction.client.pool.acquire() as cursor:
-            await interaction.client.db_mgr.poll_stop(
-                cursor=cursor,
+            await interaction.client.database.poll_stop(
+                cursor,
                 poll_hid=self.poll.poll_hid
             )
             await self.poll.update(cursor)
@@ -120,8 +120,8 @@ class PollView(ui.View):
         return self
 
     async def run(self, cursor: Connection):
-        started = await self.client.db_mgr.poll_started(
-            cursor=cursor,
+        started = await self.client.database.poll_started(
+            cursor,
             poll_hid=self.poll.poll_hid
         )
 

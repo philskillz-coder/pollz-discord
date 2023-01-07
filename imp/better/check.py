@@ -8,6 +8,7 @@ from imp.better.interaction import BetterInteraction
 
 CALLBACK = Callable[[BetterInteraction], Coroutine[Any, Any, bool]]
 
+
 class BetterCheck:
     def __init__(self, name: str, callback: CALLBACK):
         self.name = name
@@ -26,7 +27,9 @@ class BetterCheck:
 
             raise errors.HandeledCheckException(e, message="%s check failed" % self.name)
 
+
 def better_check(name: str):
     def _better_check(callback: CALLBACK):
         return BetterCheck(name, callback)
+
     return _better_check

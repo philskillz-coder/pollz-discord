@@ -1,11 +1,11 @@
 import asyncio
 from asyncpg import connect
-from imp.data.config import CONNECTION_ARGS
+from imp.data.config import POOL
 
 from typing import List, Tuple
 
 async def main():
-    cursor = await connect(**CONNECTION_ARGS)
+    cursor = await connect(**POOL)
     done = False
 
     while not done:

@@ -5,6 +5,7 @@ from abc import ABC
 from discord import app_commands
 
 from imp.classes.option import PollOption
+from imp.database.database import Database
 from imp.errors import TransformerException
 
 from typing import TYPE_CHECKING, List, Tuple
@@ -22,12 +23,12 @@ class Option_Transformer(app_commands.Transformer, ABC):
         code, *_ = raw_code
 
         async with interaction.client.pool.acquire() as cursor:
-            guild_uuid = await interaction.client.db_mgr.get_guild_uuid(
-                cursor=cursor,
+            guild_uuid = await interaction.client.database.get_guild_hid(
+                cursor,
                 guild_id=interaction.guild.id
             )
-            exists = await interaction.client.db_mgr.poll_option_exists(
-                cursor=cursor,
+            exists = await interaction.client.database.poll_option_exists(
+                cursor,
                 guild_hid=guild_uuid,
                 option_hid=code
             )
@@ -35,32 +36,31 @@ class Option_Transformer(app_commands.Transformer, ABC):
             if not exists:
                 raise TransformerException(f"A poll option with the id `{code}` does not exist!")
 
-            poll_code = await interaction.client.db_mgr.get_option_poll(
-                cursor=cursor,
+            poll_hid = await interaction.client.database.get_option_poll(
+                cursor,
                 option_hid=code
             )
-            return await (await interaction.client.manager.get_poll(poll_code)).get_option(cursor, code)
+            return await (interaction.client.manager.get_poll(poll_hid)).get_option(cursor, code)
 
     @classmethod
     async def autocomplete(cls, interaction: BetterInteraction, value: str) -> List[app_commands.Choice[str]]:
         async with interaction.client.pool.acquire() as cursor:
-            poll_clean_id = interaction.namespace.poll
-            _poll_raw_id = interaction.client.hash_mgr.decode(poll_clean_id)
-            if not _poll_raw_id:
-                return []
+            poll_hid = interaction.namespace.poll
+            _poll_hid, *_ = Database.save_unpack(interaction.client.poll_hashids.decode(poll_hid))
 
-            _id, *_ = _poll_raw_id
+            if _poll_hid is None:
+                return []
 
             raw_ids: List[Tuple[int, str]] = await cursor.fetch(
                 "SELECT id, name FROM poll_options WHERE poll = $1",
-                _id
+                _poll_hid
             )
 
         value = value.upper()
 
         choices: List[app_commands.Choice] = []
         for raw_id, name in raw_ids:
-            clean_id = interaction.client.hash_mgr.encode(raw_id)
+            clean_id = interaction.client.option_hashids.encode(raw_id)
             if clean_id.startswith(value) or name.startswith(value):
                 choices.append(app_commands.Choice(name=f"{clean_id} | {name}", value=clean_id))
 

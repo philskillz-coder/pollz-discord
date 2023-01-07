@@ -1,12 +1,8 @@
 from __future__ import annotations
 
-import discord
-
-from imp.errors import PollException
+from typing import TYPE_CHECKING, Optional
 
 from asyncpg import Connection
-
-from typing import TYPE_CHECKING, Optional, List, Tuple
 
 if TYPE_CHECKING:
     from imp.better.bot import BetterBot
@@ -24,14 +20,14 @@ class PollOption:
         return self._option_hid
 
     async def name(self, cursor: Connection) -> Optional[str]:
-        return await self.client.db_mgr.get_poll_option_name(
-            cursor=cursor,
+        return await self.client.database.get_poll_option_name(
+            cursor,
             option_hid=self.option_hid
         )
 
     async def vote_percentage(self, cursor: Connection) -> Optional[float]:
-        return await self.client.db_mgr.get_poll_option_vote_percentage(
-            cursor=cursor,
+        return await self.client.database.get_poll_option_vote_percentage(
+            cursor,
             poll_hid=self.poll.poll_hid,
             option_hid=self.option_hid
         )
