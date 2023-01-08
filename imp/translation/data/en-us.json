@@ -1,0 +1,16 @@
+{
+  "poll.title": "Poll \"{name}\"",
+  "poll.footer": "Poll id: {id}",
+  "poll.already_voted":  "You have already voted in this poll.",
+  "poll.voted": "You voted for the option `{option}`.",
+  "poll.finished":  "Poll ended",
+  "poll.add_option.already_started": "The poll `{id}` has already started. You cannot add options anymore!",
+  "poll.add_option.maximum_reached": "You can't add anymore options because the poll already has {count} options!",
+  "poll.add_option.success":  "The option `{option}` was added to the poll `{id}`.",
+  "poll.start.already_started": "The poll `{id}` has already started.",
+  "poll.start.success":  "The poll `{id}` was startet successfully.",
+  "poll.stop.not_started": "The poll `{id}` has not started yet.",
+  "poll.stop.success": "The poll `{id}` stopped successfully.",
+  "poll.create.success":  "The poll `{id}` (`{title}`) was created successfully.",
+  "settings.set_language.success": "The language was set to `{language}` successfully."
+}

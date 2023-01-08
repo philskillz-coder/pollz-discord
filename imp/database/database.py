@@ -146,6 +146,13 @@ class Database:
 
         return display_language
 
+    async def set_guild_language(self, cursor: Connection, /, guild_hid: str, language: str) -> None:
+        _guild_hid, *_ = Database.save_unpack(self._guild_hashids.decode(guild_hid))
+        await cursor.execute(
+            "UPDATE guild_settings SET \"display_language\" = $1 WHERE guild = $2;",
+            language, _guild_hid
+        )
+
     async def poll_exists(self, cursor: Connection, /, poll_hid: str) -> RT_BOOL:
         _poll_hid, *_ = Database.save_unpack(self._poll_hashids.decode(poll_hid))
         values: DB_BOOL = await cursor.fetchrow(

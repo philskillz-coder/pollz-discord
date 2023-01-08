@@ -7,7 +7,7 @@ import discord
 from discord import app_commands, Embed
 
 from imp.better.cog import BetterCog
-from imp.transformers import POLL_TRANSFORMER
+from imp.transformers import POLL_TRANSFORMER, LANGUAGE_TRANSFORMER
 from imp.views.poll import PollView
 import matplotlib.pyplot as plt
 
@@ -284,70 +284,42 @@ class Main(BetterCog):
 
         file.close()
 
-    # @app_commands.command(
-    #     name="vote",
-    #     description="vote for a poll"
-    # )
-    # async def vote(
-    #         self,
-    #         interaction: BetterInteraction,
-    #         poll: POLL_TRANSFORMER,
-    #         option: OPTION_TRANSFORMER
-    # ):
-    #     async with self.client.pool.acquire() as cursor:
-    #         guild_hid = await interaction.client.database.get_guild_hid(
-    #             cursor,
-    #             guild_id=interaction.guild.id
-    #         )
-    #
-    #         if not await poll.started(cursor):
-    #             return await interaction.response.send_message(
-    #                 content=await self.client.translator.translate(
-    #                     cursor=cursor,
-    #                     guild=guild_hid,
-    #                     key="main.vote.response.not_started"
-    #                 )
-    #             )
-    #
-    #         if await poll.user_voted(cursor, interaction.user.id):
-    #             # if await poll.has_flag(cursor, 1):
-    #             #     translation = await self.client.translator.translate(
-    #             #         cursor=cursor,
-    #             #         guild=guild_uuid,
-    #             #         key="main.vote.response.voted.reconsider"
-    #             #     )
-    #             # else:
-    #             #     translation = await self.client.translator.translate(
-    #             #         cursor=cursor,
-    #             #         guild=guild_uuid,
-    #             #         key="main.vote.response.voted.no_reconsider"
-    #             #     )
-    #             translation = "<TRANSLATION:main.vote.response.voted.no_reconsider>"
-    #
-    #             return await interaction.response.send_message(
-    #                 content=translation,
-    #                 ephemeral=True
-    #             )
-    #
-    #         await interaction.response.send_message(
-    #             content=await poll.client.translator.translate(
-    #                 cursor,
-    #                 guild=interaction.guild,
-    #                 key="poll.voted",
-    #                 option=await option.name(cursor)
-    #             ),
-    #             ephemeral=True
-    #         )
-    #
-    #         await option.poll.add_vote(
-    #             cursor,
-    #             PollVote(interaction.user.id, option.poll.poll_hid, option.option_hid)
-    #         )
-    #         # self.client.manager.set_poll(poll)
-    #
-    #         await asyncio.sleep(poll.UPDATE_TIME)
-    #         if poll.update_ready():
-    #             await poll.update(cursor)
+    group = app_commands.Group(
+        name="settings",
+        description="Guild settings"
+    )
+
+    @group.command(
+        name="language",
+        description="Set your guilds language"
+    )
+    @app_commands.checks.has_permissions(
+        administrator=True
+    )
+    async def vote(
+            self,
+            interaction: BetterInteraction,
+            language: LANGUAGE_TRANSFORMER
+    ):
+        async with self.client.pool.acquire() as cursor:
+            guild_hid = await self.client.database.get_guild_hid(
+                cursor,
+                guild_id=interaction.guild.id
+            )
+            await self.client.database.set_guild_language(
+                cursor,
+                guild_hid=guild_hid,
+                language=language
+            )
+
+            return await interaction.response.send_message(
+                content=await self.client.translator.translate(
+                    cursor,
+                    guild=guild_hid,
+                    key="settings.set_language.success",
+                    language=language
+                )
+            )
 
 
 async def setup(client: BetterBot):
