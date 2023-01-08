@@ -114,7 +114,7 @@ class PollView(ui.View):
         self.poll = poll
 
     async def add_options(self, cursor: Connection):
-        for option in (await self.poll.options(cursor)).values():
+        for option in (await self.poll.options(cursor)):
             self.add_item(
                 PollOptionButton(option, label=await option.name(cursor), custom_id=f"poll:{self.poll.poll_hid}:option:{option.option_hid}")
             )

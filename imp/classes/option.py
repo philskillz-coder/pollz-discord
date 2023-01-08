@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import TYPE_CHECKING, Optional
 
 from asyncpg import Connection
@@ -9,9 +7,18 @@ if TYPE_CHECKING:
 
 
 class PollOption:
-    def __init__(self, poll: Poll, option_hid: str):
-        self.poll = poll
-        self._option_hid = option_hid
+
+    # noinspection PyTypeChecker
+    def __init__(self):
+        self.poll: "Poll" = None
+        self._option_hid: str = None
+
+    @classmethod
+    def from_data(cls, poll: "Poll", option_hid: str):
+        instance = cls()
+        instance.poll = poll
+        instance._option_hid = option_hid
+        return instance
 
     @property
     def option_hid(self) -> str:
@@ -23,9 +30,9 @@ class PollOption:
             option_hid=self.option_hid
         )
 
-    async def vote_percentage(self, cursor: Connection) -> Optional[float]:
-        return await self.poll.client.database.get_option_vote_percentage(
+    async def vote_count(self, cursor: Connection) -> Optional[int]:
+        return await self.poll.client.database.get_option_vote_count(
             cursor,
-            poll_hid=self.poll.poll_hid,
             option_hid=self.option_hid
         )
+

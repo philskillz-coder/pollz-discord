@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import datetime
-from typing import TYPE_CHECKING, Optional, Dict
+from typing import TYPE_CHECKING, Optional, List
 
 import discord
 from asyncpg import Connection
@@ -9,6 +9,7 @@ from asyncpg import Connection
 from imp.classes.option import PollOption
 from imp.classes.vote import PollVote
 from imp.database.database import Database
+from imp.emoji import Colors
 from imp.views.poll import PollView
 
 if TYPE_CHECKING:
@@ -18,6 +19,7 @@ if TYPE_CHECKING:
 # noinspection PyTypeChecker
 class Poll:
     UPDATE_TIME = 10
+    MAX_OPTION_COUNT = 8
 
     def __init__(self, client: BetterBot, poll_hid: str):
         self.client = client
@@ -73,15 +75,15 @@ class Poll:
             poll_hid=self.poll_hid
         )
 
-    async def options(self, cursor: Connection) -> Optional[Dict[str, PollOption]]:
+    async def options(self, cursor: Connection) -> Optional[List[PollOption]]:
         options = await self.client.database.get_poll_options(
             cursor,
             poll_hid=self.poll_hid
         )
 
-        return {
-            code: PollOption(self, code) for code in options
-        }
+        return [
+            PollOption.from_data(self, code) for code in options
+        ]
 
     async def guild(self, cursor: Connection):
         if self._guild is not None:
@@ -151,32 +153,47 @@ class Poll:
             cursor,
             poll_hid=self.poll_hid
         )
+        total_votes = await self.total_votes(cursor)
 
-        raw_options = []
-        for opt in options.values():
-            v = f"(`{opt.option_hid}`) **{await opt.name(cursor)}**:{(max_opt - len(await opt.name(cursor))) * ' '} {await opt.vote_percentage(cursor)}%"
-            raw_options.append(v)
+        _option_string = []
+        _color_string = ""
+        chars_used = 0
+        max_chars = 100
 
-        option_string = "\n".join(
-            raw_options
-        )
+        for i, opt in enumerate(options):
+            name = await opt.name(cursor)
+            vote_count = await opt.vote_count(cursor)
+            percentage = round(vote_count / total_votes, 4) if total_votes >= 1 else 0.0000
+
+            line = f"{Colors.emojis[i]} **{name}**:{(max_opt - len(name)) * ' '} {percentage*100}%"
+            _option_string.append(line)
+
+            char_count = int(percentage*max_chars)
+            chars_used += char_count
+            _color_string += char_count * Colors.emojis[i]
+
+        option_string = "\n".join(_option_string)
+        _color_string += (max_chars - chars_used) * Colors.black
+        color_string = "\n".join([_color_string[i:i + 25] for i in range(0, len(_color_string), 25)])
+
         poll_info = f"```\n{await self.description(cursor)}```"
         poll_votes = f"**Total Votes**: {await self.total_votes(cursor)}"
 
+        guild = await self.guild(cursor)
         title_translation = await self.client.translator.translate(
             cursor,
-            guild=await self.guild(cursor),
+            guild=guild,
             key="poll.title",
             name=(await self.title(cursor)).upper()
         )
-        finished_translation = await self.client.translator.translate(
+        stopped_translation = await self.client.translator.translate(
             cursor,
-            guild=await self.guild(cursor),
-            key='poll.finished'
+            guild=guild,
+            key="poll.finished"
         )
         embed = discord.Embed(
             title=title_translation,
-            description=f"**{finished_translation}**\n{poll_info}{poll_votes}\n{option_string}",
+            description=f"{poll_info}\n{color_string}\n{stopped_translation}\n{poll_votes}\n{option_string}",
             colour=discord.Colour.red()
         )
         embed.set_footer(
@@ -187,9 +204,8 @@ class Poll:
                 id=self.poll_hid
             )
         )
-
         message = await self.message(cursor)
-        await message.edit(embed=embed, view=self.view)
+        await message.edit(embed=embed, view=self)
         await self.delete(cursor)
 
     async def delete(self, cursor: Connection):
@@ -212,7 +228,7 @@ class Poll:
         )
 
     async def get_option(self, cursor: Connection, option_hid: str):
-        return (await self.options(cursor)).get(option_hid)
+        return [i for i in await self.options(cursor) if i.option_hid == option_hid][0]
 
     async def update(self, cursor: Connection):
         options = await self.options(cursor)
@@ -220,15 +236,29 @@ class Poll:
             cursor,
             poll_hid=self.poll_hid
         )
+        total_votes = await self.total_votes(cursor)
 
-        raw_options = []
-        for opt in options.values():
-            v = f"(`{opt.option_hid}`) **{await opt.name(cursor)}**:{(max_opt - len(await opt.name(cursor))) * ' '} {await opt.vote_percentage(cursor)}%"
-            raw_options.append(v)
+        _option_string = []
+        _color_string = ""
+        chars_used = 0
+        max_chars = 100
 
-        option_string = "\n".join(
-            raw_options
-        )
+        for i, opt in enumerate(options):
+            name = await opt.name(cursor)
+            vote_count = await opt.vote_count(cursor)
+            percentage = round(vote_count/total_votes, 4) if total_votes >= 1 else 0.0000
+
+            line = f"{Colors.emojis[i]} **{name}**:{(max_opt - len(name))*' '} {percentage*100}%"
+            _option_string.append(line)
+
+            char_count = int(percentage*max_chars)
+            chars_used += char_count
+            _color_string += char_count * Colors.emojis[i]
+
+        option_string = "\n".join(_option_string)
+        _color_string += (max_chars-chars_used) * Colors.black
+        color_string = "\n".join([_color_string[i:i+25] for i in range(0, len(_color_string), 25)])
+
         poll_info = f"```\n{await self.description(cursor)}```"
         poll_votes = f"**Total Votes**: {await self.total_votes(cursor)}"
 
@@ -240,7 +270,7 @@ class Poll:
         )
         embed = discord.Embed(
             title=title_translation,
-            description=f"{poll_info}{poll_votes}\n{option_string}",
+            description=f"{poll_info}\n{color_string}\n{poll_votes}\n{option_string}",
             colour=discord.Colour.green() if await self.started(cursor) else discord.Colour.yellow()
         )
         embed.set_footer(
@@ -271,4 +301,9 @@ class Poll:
             poll_hid=self.poll_hid,
             user_id=user
         )
+
         return voted
+
+    async def option_count(self, cursor: Connection):
+        return await self.client.database.poll_option_count(cursor, self.poll_hid)
+

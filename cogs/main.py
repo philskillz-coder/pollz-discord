@@ -107,7 +107,7 @@ class Main(BetterCog):
     ):
         # TODO: check if poll option exists
         async with self.client.pool.acquire() as cursor:
-            guild_uuid = await self.client.database.get_guild_hid(
+            guild_hid = await self.client.database.get_guild_hid(
                 cursor,
                 guild_id=interaction.guild.id
             )
@@ -116,12 +116,24 @@ class Main(BetterCog):
                 return await interaction.response.send_message(
                     content=await self.client.translator.translate(
                         cursor,
-                        guild=guild_uuid,
+                        guild=guild_hid,
                         key="poll.add_option.already_started",
                         id=poll.poll_hid
                     ),
                     ephemeral=True
                 )
+
+            if await poll.option_count(cursor) > poll.MAX_OPTION_COUNT:
+                return await interaction.response.send_message(
+                    content=await self.client.translator.translate(
+                        cursor,
+                        guild=guild_hid,
+                        key="poll.add_option.maximum_reached",
+                        count=poll.MAX_OPTION_COUNT
+                    ),
+                    ephemeral=True
+                )
+
             await poll.add_option(cursor, name)
 
             await poll.update(cursor)
@@ -130,7 +142,7 @@ class Main(BetterCog):
             await interaction.response.send_message(
                 content=await self.client.translator.translate(
                     cursor,
-                    guild=guild_uuid,
+                    guild=guild_hid,
                     key="poll.add_option.success",
                     id=poll.poll_hid,
                     option=name
@@ -234,6 +246,7 @@ class Main(BetterCog):
             poll: POLL_TRANSFORMER
     ):
         async with self.client.pool.acquire() as cursor:
+            total_votes = await poll.total_votes(cursor)
             _labels = await self.client.database.get_poll_options(
                 cursor,
                 poll_hid=poll.poll_hid
@@ -244,12 +257,12 @@ class Main(BetterCog):
                     option_hid
                 ) for option_hid in _labels
             ]
+
             sizes = [
-                await self.client.database.get_option_vote_percentage(
+                round(await self.client.database.get_option_vote_count(
                     cursor,
-                    poll_hid=poll.poll_hid,
                     option_hid=option_hid
-                ) for option_hid in _labels
+                ) / total_votes, 2) if total_votes >= 1 else 0.00 for option_hid in _labels
             ]
 
         fig1, ax1 = plt.subplots()
@@ -270,7 +283,6 @@ class Main(BetterCog):
         )
 
         file.close()
-
 
     # @app_commands.command(
     #     name="vote",

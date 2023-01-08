@@ -5,6 +5,7 @@
   "poll.voted",
   "poll.finished",
   "poll.add_option.already_started",
+  "poll.add_option.maximum_reached",
   "poll.add_option.success",
   "poll.start.already_started",
   "poll.start.success",

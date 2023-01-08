@@ -5,6 +5,7 @@
   "poll.voted": "Du hast für die Option `{option}` gestimmt.",
   "poll.finished":  "Abstimmung beendet",
   "poll.add_option.already_started": "Die Abstimmung `{id}` hat bereits gestartet. Du kannst keine Optionen mehr hinzufügen!",
+  "poll.add_option.maximum_reached": "Du kannst keine Optionen mehr hinzufügen da die Abstimmung schon {count} optionen hat!",
   "poll.add_option.success":  "Die Option `{option}` wurde zur Abstimmung `{id}` hinzugefügt.",
   "poll.start.already_started": "Die Abstimmung `{id}` hat bereits gestartet.",
   "poll.start.success":  "Die Abstimmung `{id}` wurde erfolgreich gestartet.",

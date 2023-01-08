@@ -1,13 +1,12 @@
-from datetime import datetime
-
-from discord.ext.commands import Bot
 from asyncpg import Pool, create_pool
+from discord.ext.commands import Bot
 from hashids import Hashids
+
+from imp.better.logger import BetterLogger
+from imp.classes import PollManager
 from imp.data import config
 from imp.database import database
 from imp.translation.translator import Translator
-from imp.classes import PollManager
-from imp.better.logger import BetterLogger
 
 
 class BetterBot(Bot, BetterLogger):

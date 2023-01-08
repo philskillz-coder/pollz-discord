@@ -26,8 +26,6 @@ DB_GENERIC = Optional[Tuple[T]]
 RT_GENERIC = Optional[T]
 
 """
-CREATE EXTENSION pg_hashids;
-
 CREATE TABLE guilds (
     "id" SERIAL PRIMARY KEY NOT NULL UNIQUE,
     "guild_id" BIGINT NOT NULL UNIQUE
@@ -44,6 +42,7 @@ CREATE TABLE polls (
     "id" SERIAL PRIMARY KEY NOT NULL UNIQUE,
     "guild" BIGINT NOT NULL,
     "started" BOOLEAN NOT NULL DEFAULT FALSE,
+    "option_count" SMALLINT NOT NULL DEFAULT 0,
     
     CONSTRAINT fk_guild FOREIGN KEY("guild") REFERENCES guilds("id") ON DELETE CASCADE
 );
@@ -184,6 +183,16 @@ class Database:
 
         return name
 
+    async def poll_option_count(self, cursor: Connection, /, poll_hid: str) -> RT_INT:
+        _poll_hid, *_ = Database.save_unpack(self._poll_hashids.decode(poll_hid))
+        values: DB_INT = await cursor.fetchrow(
+            "SELECT \"option_count\" FROM polls WHERE \"id\" = $1",
+            _poll_hid
+        )
+        count, *_ = Database.save_unpack(values)
+
+        return count
+
     async def poll_vote_count(self, cursor: Connection, /, poll_hid: str) -> RT_INT:
         _poll_hid, *_ = Database.save_unpack(self._poll_hashids.decode(poll_hid))
         values: DB_INT = await cursor.fetchrow(
@@ -263,6 +272,7 @@ class Database:
 
     async def create_poll_option(self, cursor: Connection, /, poll_hid: str, option_name: str) -> RT_INT:
         _poll_hid, *_ = Database.save_unpack(self._poll_hashids.decode(poll_hid))
+        await cursor.execute("UPDATE polls SET \"option_count\" = \"option_count\" + 1 WHERE \"id\" = $1", _poll_hid)
         values: DB_INT = await cursor.fetchrow(
             "INSERT INTO poll_options(\"poll\", \"name\") VALUES($1, $2) RETURNING \"id\"",
             _poll_hid, option_name
@@ -293,42 +303,15 @@ class Database:
 
         return max_length
 
-    async def get_option_vote_percentage(self, cursor: Connection, /, poll_hid: str, option_hid: str) -> RT_FLOAT:
-        _poll_hid, *_ = Database.save_unpack(self._poll_hashids.decode(poll_hid))
+    async def get_option_vote_count(self, cursor: Connection, /, option_hid: str) -> RT_INT:
         _option_hid, *_ = Database.save_unpack(self._option_hashids.decode(option_hid))
-
-        values: DB_FLOAT = await cursor.fetchrow(
-            """
-SELECT (
-    CASE (SELECT count("vote"."id") FROM poll_votes AS "vote" JOIN poll_options AS "option" ON "vote"."option" = "option"."id" JOIN polls AS "poll" ON "option"."poll" = "poll"."id" WHERE "poll"."id" = $1)
-        WHEN 0 THEN 0
-        ELSE round(
-            (
-                cast(
-                    (
-                        SELECT count("vote"."id")
-                        FROM poll_votes AS "vote"
-                        WHERE "vote"."option" = $2
-                    ) AS numeric
-                ) / cast(
-                    (
-                        SELECT count("vote"."id")
-                        FROM poll_votes AS "vote"
-                        JOIN poll_options AS "option" ON "option"."id" = "vote"."option"
-                        JOIN polls AS "poll" ON "poll"."id" = "option"."poll"
-                        WHERE "poll"."id" = $1
-                    ) AS numeric
-                )
-            )*100,
-            2
+        values: DB_INT = await cursor.fetchrow(
+            "SELECT count(\"id\") FROM poll_votes WHERE \"option\" = $1",
+            _option_hid
         )
-    END
-);""",
-            _poll_hid, _option_hid
-        )
-        percentage, *_ = Database.save_unpack(values)
+        count, *_ = Database.save_unpack(values)
 
-        return percentage
+        return count
 
     async def poll_option_exists(self, cursor: Connection, /, option_hid: str) -> RT_BOOL:
         _option_hid, *_ = Database.save_unpack(self._option_hashids.decode(option_hid))
