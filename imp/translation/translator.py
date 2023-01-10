@@ -1,12 +1,11 @@
-import discord
-from asyncpg import Connection
-import aiofiles
 import json
 import os
+from typing import List, Dict, TYPE_CHECKING
+
+import aiofiles
+from asyncpg import Connection
+
 from imp.better.logger import BetterLogger
-
-from typing import List, Dict, Union, TYPE_CHECKING
-
 from imp.data.colors import Colors
 
 if TYPE_CHECKING:
@@ -63,30 +62,24 @@ class Translator(BetterLogger):
 
         return instance
 
-    async def __call__(self, cursor: Connection, /, guild: discord.Guild, key: str, **format_args):
+    async def __call__(self, cursor: Connection, /, guild: str, key: str, **format_args):
         return await self.translate(cursor, guild, key, **format_args)
 
     async def translate(
             self,
             cursor: Connection,
             /,
-            guild: Union[discord.Guild, str],
+            guild_hid: str,
             key: str,
             **format_args
     ):
-        if isinstance(guild, discord.Guild):
-            guild_hid = await self.client.database.get_guild_hid(
-                cursor,
-                guild_id=guild.id
-            )
-
-        else:
-            guild_hid = guild
-
         guild_language = await self.client.database.get_guild_language(
             cursor,
             guild_hid=guild_hid
         )
+        print(guild_hid, guild_language)
+        if guild_hid is None or guild_language is None:
+            raise ValueError("None")
 
         locale = self.data.get(guild_language, self.default_locale)
         _translation = locale.get(key, f"<TRANSLATION:{key}>")

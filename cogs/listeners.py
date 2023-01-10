@@ -32,4 +32,4 @@ class Listeners(BetterCog):
 
 
 async def setup(client: BetterBot):
-    await client.add_cog(Listeners(client), guilds=client.config.GUILD_IDS)
+    await client.add_cog(Listeners(client), guilds=client.config["guilds"])

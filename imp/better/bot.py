@@ -4,14 +4,13 @@ from hashids import Hashids
 
 from imp.better.logger import BetterLogger
 from imp.classes import PollManager
-from imp.data import config
 from imp.database import database
 from imp.translation.translator import Translator
 
 
 class BetterBot(Bot, BetterLogger):
     pool: Pool
-    config = config
+    config: dict
     database: database.Database
     translator: Translator
     manager: PollManager
@@ -22,14 +21,14 @@ class BetterBot(Bot, BetterLogger):
 
     async def init_pool(self):
         self.pool = await create_pool(
-            **self.config.POOL
+            **self.config["database"]
         )
 
     async def init_hash_ids(self):
-        self.guild_hashids = Hashids(**config.GUILD_HASHIDS)
-        self.poll_hashids = Hashids(**config.POLL_HASHIDS)
-        self.option_hashids = Hashids(**config.OPTION_HASHIDS)
-        self.vote_hashids = Hashids(**config.VOTES_HASHIDS)
+        self.guild_hashids = Hashids(**self.config["guild_hash_ids"])
+        self.poll_hashids = Hashids(**self.config["poll_hash_ids"])
+        self.option_hashids = Hashids(**self.config["option_hash_ids"])
+        self.vote_hashids = Hashids(**self.config["vote_hash_ids"])
 
     async def init_database(self):
         self.database = database.Database(

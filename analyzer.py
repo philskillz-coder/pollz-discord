@@ -1,5 +1,4 @@
 import os
-import matplotlib.pyplot as plt
 
 directory = os.getcwd()
 _dir = os.walk(directory)

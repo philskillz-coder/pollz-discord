@@ -153,6 +153,14 @@ class Database:
             language, _guild_hid
         )
 
+    async def get_guild_polls(self, cursor: Connection, /, guild_hid: str) -> RT_LIST[RT_STR]:
+        _guild_hid, *_ = Database.save_unpack(self._guild_hashids.decode(guild_hid))
+        values = await cursor.fetch("SELECT \"id\" FROM polls WHERE \"guild\" = $1", _guild_hid)
+
+        return [
+            self._poll_hashids.encode(v) for v, in values
+        ]
+
     async def poll_exists(self, cursor: Connection, /, poll_hid: str) -> RT_BOOL:
         _poll_hid, *_ = Database.save_unpack(self._poll_hashids.decode(poll_hid))
         values: DB_BOOL = await cursor.fetchrow(
@@ -243,12 +251,11 @@ class Database:
     async def get_poll_guild(self, cursor: Connection, /, poll_hid: str) -> RT_STR:
         _poll_hid, *_ = Database.save_unpack(self._poll_hashids.decode(poll_hid))
         values: DB_STR = await cursor.fetchrow(
-            "SELECT \"guild_id\" FROM polls AS \"poll\" JOIN guilds AS \"guild\" ON \"poll\".\"guild\" = \"guild\".\"id\" WHERE \"poll\".\"id\" = $1",
+            "SELECT \"guild\".\"id\" FROM polls AS \"poll\" JOIN guilds AS \"guild\" ON \"poll\".\"guild\" = \"guild\".\"id\" WHERE \"poll\".\"id\" = $1",
             _poll_hid
         )
         _guild_hid, *_ = Database.save_unpack(values)
-
-        return _guild_hid
+        return self._guild_hashids.encode(_guild_hid)
 
     async def get_poll_channel(self, cursor: Connection, /, poll_hid: str) -> RT_INT:
         _poll_hid, *_ = Database.save_unpack(self._poll_hashids.decode(poll_hid))

@@ -1,4 +1,4 @@
-class Colors:
+class Emojis:
     black = "\U00002b1b"
     red = "\U0001f7e5"
     blue = "\U0001f7e6"

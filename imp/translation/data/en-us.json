@@ -12,5 +12,6 @@
   "poll.stop.not_started": "The poll `{id}` has not started yet.",
   "poll.stop.success": "The poll `{id}` stopped successfully.",
   "poll.create.success":  "The poll `{id}` (`{title}`) was created successfully.",
+  "poll.list.title": "All polls:",
   "settings.set_language.success": "The language was set to `{language}` successfully."
 }

@@ -8,6 +8,7 @@ from asyncpg import Connection
 from discord import ui
 
 from imp.classes.vote import PollVote
+from imp.emoji import Emojis
 
 if TYPE_CHECKING:
     from imp.better.interaction import BetterInteraction
@@ -16,9 +17,10 @@ if TYPE_CHECKING:
 
 
 class PollOptionButton(ui.Button):
-    def __init__(self, option: PollOption, label: str, custom_id: str):
+    def __init__(self, option: PollOption, label: str, emoji: str, custom_id: str):
         super().__init__(
             label=label,
+            emoji=emoji,
             custom_id=custom_id
         )
         self.option = option
@@ -32,7 +34,7 @@ class PollOptionButton(ui.Button):
                 return await interaction.response.send_message(
                     content=await self.option.poll.client.translator.translate(
                         cursor,
-                        guild=interaction.guild,
+                        guild_hid=await self.option.poll.guild(cursor),
                         key="poll.already_voted"
                     ),
                     ephemeral=True
@@ -41,7 +43,7 @@ class PollOptionButton(ui.Button):
             await interaction.response.send_message(
                 content=await self.option.poll.client.translator.translate(
                     cursor,
-                    guild=interaction.guild,
+                    guild_hid=await self.option.poll.guild(cursor),
                     key="poll.voted",
                     option=await self.option.name(cursor)
                 ),
@@ -76,7 +78,7 @@ class PollStartButton(ui.Button):
             await interaction.response.send_message(
                 content=await self.poll.client.translator.translate(
                     cursor,
-                    guild=interaction.guild,
+                    guild_hid=await self.poll.guild(cursor),
                     key="poll.start.success",
                     id=self.poll.poll_hid
                 ),
@@ -96,16 +98,18 @@ class PollStopButton(ui.Button):
 
     async def callback(self, interaction: BetterInteraction):
         async with interaction.client.pool.acquire() as cursor:
-            await self.poll.stop(cursor)
+
             await interaction.response.send_message(
                 content=await self.poll.client.translator.translate(
                     cursor,
-                    guild=interaction.guild,
+                    guild_hid=await self.poll.guild(cursor),
                     key="poll.stop.success",
                     id=self.poll.poll_hid
                 ),
                 ephemeral=True
             )
+
+        await self.poll.stop(cursor)
 
 
 class PollView(ui.View):
@@ -114,9 +118,13 @@ class PollView(ui.View):
         self.poll = poll
 
     async def add_options(self, cursor: Connection):
-        for option in (await self.poll.options(cursor)):
+        for i, option in enumerate(await self.poll.options(cursor)):
             self.add_item(
-                PollOptionButton(option, label=await option.name(cursor), custom_id=f"poll:{self.poll.poll_hid}:option:{option.option_hid}")
+                PollOptionButton(
+                    option,
+                    label=await option.name(cursor),
+                    emoji=Emojis.emojis[i],
+                    custom_id=f"poll:{self.poll.poll_hid}:option:{option.option_hid}")
             )
 
         return self

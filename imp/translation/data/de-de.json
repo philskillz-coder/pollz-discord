@@ -12,5 +12,6 @@
   "poll.stop.not_started": "Die Abstimmung `{id}` wurde noch nicht gestartet.",
   "poll.stop.success": "Die Abstimmung `{id}` wurde gestoppt.",
   "poll.create.success":  "Die Abstimmung `{id}` (`{title}`) wurde erfolgreich erstellt.",
+  "poll.list.title": "Alle Abstimmungen:",
   "settings.set_language.success": "Die Sprache wurde erfolgreich auf `{language}` gesetzt."
 }

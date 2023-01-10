@@ -2,8 +2,24 @@ import discord
 
 from imp.better import BetterBot
 from imp.views.poll import PollView
+from imp.data import config
 from typing import List, Tuple
 import asyncio
+from argparse import ArgumentParser
+
+parser = ArgumentParser()
+parser.add_argument(
+    "-c", "--configuration",
+    type=str,
+    required=False,
+    metavar="configuration"
+)
+parser.add_argument(
+    "--sync",
+    action="store_true"
+)
+
+sysargs = parser.parse_args()
 
 discord.utils.setup_logging()
 
@@ -13,10 +29,6 @@ class Bot(BetterBot):
         "cogs.main",
         "cogs.listeners"
     ]
-    MESSAGE_COMMANDS_DISABLED = True
-
-    # async def on_message(self, message: Message, /) -> None:
-    #     self.MESSAGE_COMMANDS_DISABLED or await self.process_commands(message)
 
     async def load_cogs(self):
         for cog in self.INIT_COGS:
@@ -24,7 +36,7 @@ class Bot(BetterBot):
 
     async def sync(self):
         # await self.tree.sync()
-        # for guild in self.config.GUILD_IDS:
+        # for guild in self.config["guilds"]:
         #     await self.tree.sync(guild=guild)
         pass
 
@@ -43,8 +55,17 @@ class Bot(BetterBot):
                 self.manager.set_poll(poll)
 
     async def on_ready(self):
-        self.log("on_ready", f"Running as {self.user}")
+        self.log("on_ready", f"Running as {self.user} with {sysargs.configuration} configuration")
         self.log("on_ready", "Online")
+
+        for guild in self.guilds:
+            self.log("on_ready", f"Guild: {guild.name}:{guild.id}")
+
+    def prepare_config(self):
+        if (_config := getattr(config, sysargs.configuration, None)) is None:
+            self.log("setup_hook", "Invalid configuration!")
+            raise ValueError("Invalid configuration")
+        self.config = _config
 
     async def setup_hook(self) -> None:
         await self.init_pool()
@@ -62,6 +83,7 @@ class Bot(BetterBot):
 
 async def main():
     async with Bot("iv", application_id=914581317709070346, intents=discord.Intents.default(), log_handler=None) as bot:
-        await bot.start(token=bot.config.TOKEN, reconnect=True)
+        bot.prepare_config()
+        await bot.start(token=bot.config["token"], reconnect=True)
 
 asyncio.run(main())

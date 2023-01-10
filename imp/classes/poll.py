@@ -9,7 +9,7 @@ from asyncpg import Connection
 from imp.classes.option import PollOption
 from imp.classes.vote import PollVote
 from imp.database.database import Database
-from imp.emoji import Colors
+from imp.emoji import Emojis
 from imp.views.poll import PollView
 
 if TYPE_CHECKING:
@@ -85,20 +85,11 @@ class Poll:
             PollOption.from_data(self, code) for code in options
         ]
 
-    async def guild(self, cursor: Connection):
-        if self._guild is not None:
-            return self._guild
-
-        self._guild = self.client.get_guild(
-            await self.client.database.get_guild_id(
-                cursor,
-                guild_hid=await self.client.database.get_poll_guild(
-                    cursor,
-                    poll_hid=self.poll_hid
-                )
-            )
+    async def guild(self, cursor: Connection) -> str:
+        return await self.client.database.get_poll_guild(
+            cursor,
+            poll_hid=self.poll_hid
         )
-        return self._guild
 
     async def channel(self, cursor: Connection):
         if self._channel is not None:
@@ -165,15 +156,15 @@ class Poll:
             vote_count = await opt.vote_count(cursor)
             percentage = round(vote_count / total_votes, 4) if total_votes >= 1 else 0.0000
 
-            line = f"{Colors.emojis[i]} **{name}**:{(max_opt - len(name)) * ' '} {percentage*100}%"
+            line = f"{Emojis.emojis[i]} **{name}**:{(max_opt - len(name)) * ' '} {percentage * 100}%"
             _option_string.append(line)
 
             char_count = int(percentage*max_chars)
             chars_used += char_count
-            _color_string += char_count * Colors.emojis[i]
+            _color_string += char_count * Emojis.emojis[i]
 
         option_string = "\n".join(_option_string)
-        _color_string += (max_chars - chars_used) * Colors.black
+        _color_string += (max_chars - chars_used) * Emojis.black
         color_string = "\n".join([_color_string[i:i + 25] for i in range(0, len(_color_string), 25)])
 
         poll_info = f"```\n{await self.description(cursor)}```"
@@ -182,13 +173,13 @@ class Poll:
         guild = await self.guild(cursor)
         title_translation = await self.client.translator.translate(
             cursor,
-            guild=guild,
+            guild_hid=guild,
             key="poll.title",
             name=(await self.title(cursor)).upper()
         )
         stopped_translation = await self.client.translator.translate(
             cursor,
-            guild=guild,
+            guild_hid=guild,
             key="poll.finished"
         )
         embed = discord.Embed(
@@ -199,13 +190,13 @@ class Poll:
         embed.set_footer(
             text=await self.client.translator.translate(
                 cursor,
-                guild=await self.guild(cursor),
+                guild_hid=await self.guild(cursor),
                 key="poll.footer",
                 id=self.poll_hid
             )
         )
         message = await self.message(cursor)
-        await message.edit(embed=embed, view=self)
+        await message.edit(embed=embed, view=self.view)
         await self.delete(cursor)
 
     async def delete(self, cursor: Connection):
@@ -248,15 +239,15 @@ class Poll:
             vote_count = await opt.vote_count(cursor)
             percentage = round(vote_count/total_votes, 4) if total_votes >= 1 else 0.0000
 
-            line = f"{Colors.emojis[i]} **{name}**:{(max_opt - len(name))*' '} {percentage*100}%"
+            line = f"{Emojis.emojis[i]} **{name}**:{(max_opt - len(name)) * ' '} {percentage * 100}%"
             _option_string.append(line)
 
             char_count = int(percentage*max_chars)
             chars_used += char_count
-            _color_string += char_count * Colors.emojis[i]
+            _color_string += char_count * Emojis.emojis[i]
 
         option_string = "\n".join(_option_string)
-        _color_string += (max_chars-chars_used) * Colors.black
+        _color_string += (max_chars-chars_used) * Emojis.black
         color_string = "\n".join([_color_string[i:i+25] for i in range(0, len(_color_string), 25)])
 
         poll_info = f"```\n{await self.description(cursor)}```"
@@ -264,10 +255,11 @@ class Poll:
 
         title_translation = await self.client.translator.translate(
             cursor,
-            guild=await self.guild(cursor),
+            guild_hid=await self.guild(cursor),
             key="poll.title",
-            name=(await self.title(cursor)).upper()
+            name=await self.title(cursor)
         )
+        print(title_translation)
         embed = discord.Embed(
             title=title_translation,
             description=f"{poll_info}\n{color_string}\n{poll_votes}\n{option_string}",
@@ -276,7 +268,7 @@ class Poll:
         embed.set_footer(
             text=await self.client.translator.translate(
                 cursor,
-                guild=await self.guild(cursor),
+                guild_hid=await self.guild(cursor),
                 key="poll.footer",
                 id=self.poll_hid
             )
