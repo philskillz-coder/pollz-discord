@@ -24,7 +24,7 @@ class BetterCheck:
                 ephemeral=True
             )
 
-            raise errors.HandledCheckException(e, message="%s check failed" % self.name)
+            raise errors.HandledCheckException(e, message=f"{self.name} check failed")
 
 
 def better_check(name: str):

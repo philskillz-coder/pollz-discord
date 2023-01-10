@@ -125,9 +125,7 @@ class Database:
     async def get_guild_hid(self, cursor: Connection, /, guild_id: int) -> RT_STR:
         values: DB_INT = await cursor.fetchrow("SELECT \"id\" FROM guilds WHERE \"guild_id\" = $1;", guild_id)
         _guild_hid, *_ = Database.save_unpack(values)
-        guild_hid = self._guild_hashids.encode(_guild_hid)
-
-        return guild_hid
+        return self._guild_hashids.encode(_guild_hid)
 
     async def get_guild_id(self, cursor: Connection, /, guild_hid: str) -> RT_INT:
         _guild_hid, *_ = Database.save_unpack(self._guild_hashids.decode(guild_hid))
@@ -292,9 +290,7 @@ class Database:
             _poll_hid, option_name
         )
         _poll_option_hid, *_ = Database.save_unpack(values)
-        poll_option_hid = self._option_hashids.encode(_poll_option_hid)
-
-        return poll_option_hid
+        return self._option_hashids.encode(_poll_option_hid)
 
     async def remove_poll_option(self, cursor: Connection, /, option_hid: str) -> None:
         _option_hid, *_ = Database.save_unpack(self._option_hashids.decode(option_hid))

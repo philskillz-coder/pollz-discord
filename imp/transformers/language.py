@@ -13,7 +13,7 @@ class Language_Transformer(app_commands.Transformer, ABC):
     @classmethod
     async def transform(cls, interaction: "BetterInteraction", value: str) -> str:
         if value not in interaction.client.translator.available_locales:
-            raise TransformerException("The language `%s` does not exist." % value)
+            raise TransformerException(f"The language `{value}` does not exist.")
 
         return value
 
@@ -21,9 +21,9 @@ class Language_Transformer(app_commands.Transformer, ABC):
     async def autocomplete(cls, interaction: "BetterInteraction", value: str) -> List[app_commands.Choice[str]]:
         value = value.lower()
 
-        choices: List[app_commands.Choice] = []
-        for locale in interaction.client.translator.available_locales:
-            if locale.lower().startswith(value):
-                choices.append(app_commands.Choice(name=locale, value=locale))
-
+        choices: List[app_commands.Choice] = [
+            app_commands.Choice(name=locale, value=locale)
+            for locale in interaction.client.translator.available_locales
+            if locale.lower().startswith(value)
+        ]
         return choices

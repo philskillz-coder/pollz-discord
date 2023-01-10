@@ -44,11 +44,11 @@ class Translator(BetterLogger):
 
         data: Dict[str, Dict[str, str]] = {}
         for locale in available_locales:
-            async with aiofiles.open(os.path.join(locales_path, locale + ".json"), "rb") as f:
+            async with aiofiles.open(os.path.join(locales_path, f"{locale}.json"), "rb") as f:
                 _locale_data = (await f.read()).decode()
                 locale_data: dict[str, str] = json.loads(_locale_data)
 
-                if not all(key in locale_data for key in main):
+                if any(key not in locale_data for key in main):
                     instance.log("load", f"Missing translations in {locale}", Colors.YELLOW)
 
                 else:
@@ -84,6 +84,4 @@ class Translator(BetterLogger):
         locale = self.data.get(guild_language, self.default_locale)
         _translation = locale.get(key, f"<TRANSLATION:{key}>")
 
-        translation = _translation.format_map(AdvancedFormat(**format_args))
-
-        return translation
+        return _translation.format_map(AdvancedFormat(**format_args))

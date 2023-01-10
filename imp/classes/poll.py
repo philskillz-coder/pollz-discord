@@ -284,17 +284,12 @@ class Poll:
             "INSERT INTO poll_votes(\"option\", \"user\") VALUES($1, $2) RETURNING \"id\"",
             _option_hid, vote.user
         )
-        vote_hid = self.client.vote_hashids.encode(_vote_hid)
-        return vote_hid
+        return self.client.vote_hashids.encode(_vote_hid)
 
     async def user_voted(self, cursor: Connection, user: int):
-        voted = await self.client.database.poll_user_voted(
-            cursor,
-            poll_hid=self.poll_hid,
-            user_id=user
+        return await self.client.database.poll_user_voted(
+            cursor, poll_hid=self.poll_hid, user_id=user
         )
-
-        return voted
 
     async def option_count(self, cursor: Connection):
         return await self.client.database.poll_option_count(cursor, self.poll_hid)

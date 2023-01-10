@@ -71,8 +71,8 @@ sorted_folders = dict(sorted(folders.items(), key=lambda _folder: _folder[1], re
 p_files: dict[str, float] = {}
 p_folders: dict[str, float] = {}
 
-print("%s Total files" % fileCount)
-print("%s Total lines of code" % line_count)
+print(f"{fileCount} Total files")
+print(f"{line_count} Total lines of code")
 
 for file, lines in sorted_files.items():
     pc = lines / line_count
@@ -105,10 +105,10 @@ def list_files(base_path):
 
         level = root.replace(base_path, '').count(os.sep)
         indent = ' ' * 4 * level
-        print('{}{}/'.format(indent, os.path.basename(root)))
+        print(f'{indent}{os.path.basename(root)}/')
         sub_indent = ' ' * 4 * (level + 1)
         for fil in fls:
-            print('{}{}'.format(sub_indent, fil))
+            print(f'{sub_indent}{fil}')
 
 
 print()

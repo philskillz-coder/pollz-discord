@@ -33,16 +33,13 @@ async def main():
         for l_id, l_full, l_key in languages:
             print(f"SELECTED LANGUAGE: {l_full.upper()} ({l_key.upper()})")
             translation = input("Enter the translation >>> ")
-            translation = translation.replace("\\n", "\n")
-
-            if not translation:
-                finished = True
-
-            else:
+            if translation := translation.replace("\\n", "\n"):
                 await cursor.execute(
                     "INSERT INTO translations(language, code, translation) VALUES ($1, $2, $3)",
                     l_id, key_id, translation
                 )
+            else:
+                finished = True
 
 
 asyncio.run(main())

@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 class BetterCog(Cog, BetterLogger):
     def __init__(self, client: BetterBot):
         self.client = client
-        self.name = "COG-"+self.qualified_name
+        self.name = f"COG-{self.qualified_name}"
 
     async def cog_load(self) -> None:
         self.log("cog_load", "Loaded", Colors.Y)
