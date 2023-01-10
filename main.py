@@ -19,7 +19,7 @@ parser.add_argument(
     action="store_true"
 )
 
-sysargs = parser.parse_args()
+sys_args = parser.parse_args()
 
 discord.utils.setup_logging()
 
@@ -47,7 +47,7 @@ class Bot(BetterBot):
 
             for _poll_hid, in poll_hids:
                 poll = self.manager.init_poll(self.poll_hashids.encode(_poll_hid))
-                self.log("prepare_polls", f"Added poll: {await poll.title(cursor)}@{poll.poll_hid}")
+                self.log("prepare_polls", f"Added poll: {await poll.title(cursor)}@{poll.rid}")
                 view = await PollView(poll=poll).run(cursor)
                 poll.set_view(view)
 
@@ -55,14 +55,14 @@ class Bot(BetterBot):
                 self.manager.set_poll(poll)
 
     async def on_ready(self):
-        self.log("on_ready", f"Running as {self.user} with {sysargs.configuration} configuration")
+        self.log("on_ready", f"Running as {self.user} with {sys_args.configuration} configuration")
         self.log("on_ready", "Online")
 
         for guild in self.guilds:
             self.log("on_ready", f"Guild: {guild.name}:{guild.id}")
 
     def prepare_config(self):
-        if (_config := getattr(config, sysargs.configuration, None)) is None:
+        if (_config := getattr(config, sys_args.configuration, None)) is None:
             self.log("setup_hook", "Invalid configuration!")
             raise ValueError("Invalid configuration")
         self.config = _config

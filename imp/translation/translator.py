@@ -62,24 +62,21 @@ class Translator(BetterLogger):
 
         return instance
 
-    async def __call__(self, cursor: Connection, /, guild: str, key: str, **format_args):
-        return await self.translate(cursor, guild, key, **format_args)
+    async def __call__(self, cursor: Connection, /, guild_rid: int, key: str, **format_args):
+        return await self.translate(cursor, guild_rid, key, **format_args)
 
     async def translate(
             self,
             cursor: Connection,
             /,
-            guild_hid: str,
+            guild_rid: int,
             key: str,
             **format_args
     ):
-        guild_language = await self.client.database.get_guild_language(
+        guild_language = await self.client.database.guild_language(
             cursor,
-            guild_hid=guild_hid
+            guild_rid=guild_rid
         )
-        print(guild_hid, guild_language)
-        if guild_hid is None or guild_language is None:
-            raise ValueError("None")
 
         locale = self.data.get(guild_language, self.default_locale)
         _translation = locale.get(key, f"<TRANSLATION:{key}>")

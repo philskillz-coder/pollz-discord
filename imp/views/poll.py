@@ -34,7 +34,7 @@ class PollOptionButton(ui.Button):
                 return await interaction.response.send_message(
                     content=await self.option.poll.client.translator.translate(
                         cursor,
-                        guild_hid=await self.option.poll.guild(cursor),
+                        guild_rid=await self.option.poll.guild_rid(cursor),
                         key="poll.already_voted"
                     ),
                     ephemeral=True
@@ -43,7 +43,7 @@ class PollOptionButton(ui.Button):
             await interaction.response.send_message(
                 content=await self.option.poll.client.translator.translate(
                     cursor,
-                    guild_hid=await self.option.poll.guild(cursor),
+                    guild_rid=await self.option.poll.guild_rid(cursor),
                     key="poll.voted",
                     option=await self.option.name(cursor)
                 ),
@@ -52,9 +52,9 @@ class PollOptionButton(ui.Button):
 
             await self.option.poll.add_vote(
                 cursor,
-                PollVote(interaction.user.id, self.option.poll.poll_hid, self.option.option_hid)
+                PollVote(interaction.user.id, self.option.poll.rid, self.option.rid)
             )
-            await asyncio.sleep(self.option.poll.UPDATE_TIME)
+            await asyncio.sleep(self.option.poll.POLL_UPDATE_TIME)
             if self.option.poll.update_ready():
                 await self.option.poll.update(cursor)
 
@@ -72,15 +72,15 @@ class PollStartButton(ui.Button):
         async with interaction.client.pool.acquire() as cursor:
             await interaction.client.database.poll_start(
                 cursor,
-                poll_hid=self.poll.poll_hid
+                poll_rid=self.poll.rid
             )
             await self.poll.update(cursor)
             await interaction.response.send_message(
                 content=await self.poll.client.translator.translate(
                     cursor,
-                    guild_hid=await self.poll.guild(cursor),
+                    guild_rid=await self.poll.guild_rid(cursor),
                     key="poll.start.success",
-                    id=self.poll.poll_hid
+                    id=self.poll.rid
                 ),
                 ephemeral=True
             )
@@ -102,9 +102,9 @@ class PollStopButton(ui.Button):
             await interaction.response.send_message(
                 content=await self.poll.client.translator.translate(
                     cursor,
-                    guild_hid=await self.poll.guild(cursor),
+                    guild_rid=await self.poll.guild_rid(cursor),
                     key="poll.stop.success",
-                    id=self.poll.poll_hid
+                    id=self.poll.rid
                 ),
                 ephemeral=True
             )
@@ -124,23 +124,23 @@ class PollView(ui.View):
                     option,
                     label=await option.name(cursor),
                     emoji=Emojis.emojis[i],
-                    custom_id=f"poll:{self.poll.poll_hid}:option:{option.option_hid}")
+                    custom_id=f"poll:{self.poll.rid}:option:{option.hid}")
             )
 
         return self
 
     async def add_stop(self):
-        self.add_item(PollStopButton(self.poll, f"poll:{self.poll.poll_hid}:stop"))
+        self.add_item(PollStopButton(self.poll, f"poll:{self.poll.rid}:stop"))
 
     async def add_start(self):
-        self.add_item(PollStartButton(self.poll, f"poll:{self.poll.poll_hid}:start"))
+        self.add_item(PollStartButton(self.poll, f"poll:{self.poll.rid}:start"))
 
     async def press_start(self, cursor: Connection):
         self.clear_items()
         await self.add_options(cursor)
         await self.add_stop()
 
-        message = await self.poll.message(cursor)
+        message = await self.poll.message_id(cursor)
         await message.edit(
             view=self
         )
@@ -152,7 +152,7 @@ class PollView(ui.View):
     async def run(self, cursor: Connection):
         started = await self.poll.client.database.poll_started(
             cursor,
-            poll_hid=self.poll.poll_hid
+            poll_rid=self.poll.rid
         )
 
         if started:

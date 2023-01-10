@@ -16,10 +16,11 @@ if TYPE_CHECKING:
 class Poll_Transformer(app_commands.Transformer, ABC):
     @classmethod
     async def transform(cls, interaction: BetterInteraction, value: str) -> Poll:
+        # todo: get all poll rids -> convert to hids -> check similarity to value
         async with interaction.client.pool.acquire() as cursor:
             exists = await interaction.client.database.poll_exists(
                 cursor,
-                poll_hid=value,
+                poll_rid=value,
             )
 
             if not exists:
@@ -30,7 +31,7 @@ class Poll_Transformer(app_commands.Transformer, ABC):
     @classmethod
     async def autocomplete(cls, interaction: BetterInteraction, value: str) -> List[app_commands.Choice[str]]:
         async with interaction.client.pool.acquire() as cursor:
-            guild_hid = await interaction.client.database.get_guild_hid(cursor, guild_id=interaction.guild.id)
+            guild_hid = await interaction.client.database.get_guild_id(cursor, guild_id=interaction.guild.id)
             _guild_hid, *_ = Database.save_unpack(interaction.client.guild_hashids.decode(guild_hid))
 
             _poll_ids: List[Tuple[int, str]] = await cursor.fetch("SELECT \"poll\".\"id\", \"config\".\"title\" FROM polls AS \"poll\" JOIN poll_config AS \"config\" ON \"config\".\"poll\" = \"poll\".\"id\" WHERE \"poll\".\"guild\" = $1", _guild_hid)

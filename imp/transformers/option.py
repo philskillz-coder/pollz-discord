@@ -16,18 +16,19 @@ if TYPE_CHECKING:
 class Option_Transformer(app_commands.Transformer, ABC):
     @classmethod
     async def transform(cls, interaction: BetterInteraction, value: str) -> PollOption:
+        # todo: get all option rids -> convert to hids -> check similarity to value
         async with interaction.client.pool.acquire() as cursor:
             exists = await interaction.client.database.poll_option_exists(
                 cursor,
-                option_hid=value
+                option_rid=value
             )
 
             if not exists:
                 raise TransformerException(f"A poll option with the id `{value}` does not exist!")
 
-            poll_hid = await interaction.client.database.get_option_poll(
+            poll_hid = await interaction.client.database.option_poll(
                 cursor,
-                option_hid=value
+                option_rid=value
             )
 
             return await (interaction.client.manager.get_poll(poll_hid)).get_option(cursor, value)

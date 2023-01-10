@@ -1,10 +1,6 @@
-from __future__ import annotations
-
-import datetime
-from typing import TYPE_CHECKING, Optional, List
-
 import discord
 from asyncpg import Connection
+from datetime import datetime
 
 from imp.classes.option import PollOption
 from imp.classes.vote import PollVote
@@ -12,34 +8,49 @@ from imp.database.database import Database
 from imp.emoji import Emojis
 from imp.views.poll import PollView
 
+from typing import TYPE_CHECKING, Optional, List
 if TYPE_CHECKING:
     from imp.better.bot import BetterBot
 
 
 # noinspection PyTypeChecker
 class Poll:
-    UPDATE_TIME = 10
-    MAX_OPTION_COUNT = 8
+    GUILD_MAX_POLLS = 5
+    POLL_UPDATE_TIME = 10
+    POLL_MAX_OPTIONS = 8
 
-    def __init__(self, client: BetterBot, poll_hid: str):
+    def __init__(self, client: BetterBot, poll_rid: int):
         self.client = client
-        self.poll_hid = poll_hid
+        self._rid = poll_rid
+        self._hid: Optional[str] = None
 
-        self._guild: Optional[discord.Guild] = None
-        self._channel: Optional[discord.TextChannel] = None
-        self._message: Optional[discord.PartialMessage] = None
+        self._guild_rid: Optional[int] = None
+        self._guild_hid: Optional[str] = None
+        self._channel_id: Optional[int] = None
+        self._message_id: Optional[int] = None
         self.view: Optional[PollView] = None
-        self._last_vote: datetime.datetime = None
+        self._last_vote: Optional[datetime] = None
+        self._started: Optional[bool] = None
+        self._title: Optional[str] = None
+        self._description: Optional[str] = None
 
     def update_ready(self):
-        return (datetime.datetime.now()-self._last_vote).total_seconds() > self.UPDATE_TIME
+        return (datetime.now()-self._last_vote).total_seconds() > self.POLL_UPDATE_TIME
 
     @classmethod
-    async def create(cls, client: BetterBot, guild_hid: str, channel_id: int, message_id: int, poll_title: Optional[str] = None, poll_description: Optional[str] = None):
+    async def create(
+            cls,
+            client: "BetterBot",
+            _guild_hid: str,
+            channel_id: int,
+            message_id: int,
+            poll_title: Optional[str] = None,
+            poll_description: Optional[str] = None
+    ):
         async with client.pool.acquire() as cursor:
             poll_hid = await client.database.create_poll(
                 cursor,
-                guild_hid=guild_hid,
+                guild_rid=_guild_hid,
                 channel_id=channel_id,
                 message_id=message_id,
                 poll_title=poll_title,
@@ -51,83 +62,119 @@ class Poll:
     def set_view(self, view: PollView):
         self.view = view
 
-    async def started(self, cursor: Connection) -> Optional[bool]:
-        return await self.client.database.poll_started(
-            cursor,
-            poll_hid=self.poll_hid
-        )
+    @property
+    def rid(self) -> int:
+        return self.rid
 
-    async def title(self, cursor: Connection) -> Optional[str]:
-        return await self.client.database.get_poll_title(
-            cursor,
-            poll_hid=self.poll_hid
-        )
+    @property
+    def hid(self) -> str:
+        if self._hid is not None:
+            return self._hid
 
-    async def description(self, cursor: Connection) -> Optional[str]:
-        return await self.client.database.poll_description(
-            cursor,
-            poll_hid=self.poll_hid
-        )
+        self._hid = self.client.poll_hashids.encode(self.rid)
+        return self._hid
 
-    async def total_votes(self, cursor: Connection) -> Optional[int]:
+    async def started(self, cursor: Connection) -> bool:
+        if self.started is not None:
+            return self.started
+
+        self._started = await self.client.database.poll_started(
+            cursor,
+            poll_rid=self.rid
+        )
+        return self.started
+
+    async def title(self, cursor: Connection) -> str:
+        if self._title is not None:
+            return self._title
+
+        self._title = await self.client.database.poll_title(
+            cursor,
+            poll_rid=self.rid
+        )
+        return self._title
+
+    async def description(self, cursor: Connection) -> str:
+        if self._description is not None:
+            return self._description
+
+        self._description = await self.client.database.poll_description(
+            cursor,
+            poll_rid=self.rid
+        )
+        return self._description
+
+    async def total_votes(self, cursor: Connection) -> int:
         return await self.client.database.poll_vote_count(
             cursor,
-            poll_hid=self.poll_hid
+            poll_rid=self.rid
         )
 
-    async def options(self, cursor: Connection) -> Optional[List[PollOption]]:
-        options = await self.client.database.get_poll_options(
+    async def options(self, cursor: Connection) -> List[PollOption]:
+        options = await self.client.database.poll_options(
             cursor,
-            poll_hid=self.poll_hid
+            poll_rid=self.rid
         )
 
         return [
-            PollOption.from_data(self, code) for code in options
+            PollOption.from_data(self, option_rid=option_rid) for option_rid in options
         ]
 
-    async def guild(self, cursor: Connection) -> str:
-        return await self.client.database.get_poll_guild(
+    async def guild_rid(self, cursor: Connection) -> int:
+        if self._guild_rid is not None:
+            return self._guild_rid
+
+        self._guild_rid = await self.client.database.poll_guild(
             cursor,
-            poll_hid=self.poll_hid
+            poll_rid=self.rid
         )
+        return self._guild_rid
 
-    async def channel(self, cursor: Connection):
-        if self._channel is not None:
-            return self._channel
+    async def guild_hid(self, cursor: Connection) -> int:
+        if self._guild_hid is not None:
+            return self._guild_hid
 
-        self._channel = self.client.get_channel(
-            await self.client.database.get_poll_channel(
-                cursor,
-                poll_hid=self.poll_hid
-            )
+        self._guild_hid = self.client.poll_hashids.encode(await self.guild_rid(cursor))
+        return self._guild_hid
+
+    async def channel_id(self, cursor: Connection):
+        if self._channel_id is not None:
+            return self._channel_id
+
+        self._channel_id = await self.client.database.poll_channel_id(
+            cursor,
+            poll_rid=self.rid
         )
-        return self._channel
+        return self._channel_id
 
-    async def message(self, cursor: Connection):
-        if self._message is not None:
-            return self._message
+    async def message_id(self, cursor: Connection):
+        if self._message_id is not None:
+            return self._message_id
 
-        chn = await self.channel(cursor)
-        self._message = chn.get_partial_message(
-            await self.client.database.get_poll_message(
-                cursor,
-                poll_hid=self.poll_hid
-            )
+        self._message_id = await self.client.database.poll_message_id(
+            cursor,
+            poll_rid=self.rid
         )
-        return self._message
+        return self._message_id
 
     async def exists(self, cursor: Connection) -> Optional[bool]:
         return await self.client.database.poll_exists(
             cursor,
-            poll_hid=self.poll_hid
+            poll_rid=self.rid
         )
 
     async def start(self, cursor: Connection):
         await self.client.database.poll_start(
             cursor,
-            poll_hid=self.poll_hid
+            poll_rid=self.rid
         )
-        await (await self.message(cursor)).edit(
+        channel = self.client.get_partial_messageable(
+            await self.channel_id(cursor)
+        )
+        message = channel.get_partial_message(
+            await self.message_id(cursor)
+        )
+        await message.edit(
             view=await PollView(self).run(cursor)
         )
         await self.update(cursor)
@@ -136,13 +183,13 @@ class Poll:
         await self.view.press_stop()
         await self.client.database.poll_stop(
             cursor,
-            poll_hid=self.poll_hid
+            poll_rid=self.rid
         )
 
         options = await self.options(cursor)
-        max_opt = await self.client.database.get_max_poll_option_name(
+        max_opt = await self.client.database.longest_poll_option_name(
             cursor,
-            poll_hid=self.poll_hid
+            poll_rid=self.rid
         )
         total_votes = await self.total_votes(cursor)
 
@@ -170,16 +217,16 @@ class Poll:
         poll_info = f"```\n{await self.description(cursor)}```"
         poll_votes = f"**Total Votes**: {await self.total_votes(cursor)}"
 
-        guild = await self.guild(cursor)
+        guild_rid = await self.guild_rid(cursor)
         title_translation = await self.client.translator.translate(
             cursor,
-            guild_hid=guild,
+            guild_rid=guild_rid,
             key="poll.title",
             name=(await self.title(cursor)).upper()
         )
         stopped_translation = await self.client.translator.translate(
             cursor,
-            guild_hid=guild,
+            guild_rid=guild_rid,
             key="poll.finished"
         )
         embed = discord.Embed(
@@ -190,42 +237,41 @@ class Poll:
         embed.set_footer(
             text=await self.client.translator.translate(
                 cursor,
-                guild_hid=await self.guild(cursor),
+                guild_rid=guild_rid,
                 key="poll.footer",
-                id=self.poll_hid
+                id=self.rid
             )
         )
-        message = await self.message(cursor)
+        channel = self.client.get_partial_messageable(
+            await self.channel_id(cursor)
+        )
+        message = channel.get_partial_message(
+            await self.message_id(cursor)
+        )
         await message.edit(embed=embed, view=self.view)
         await self.delete(cursor)
 
     async def delete(self, cursor: Connection):
-        await self.client.database.delete_poll(
+        await self.client.database.poll_delete(
             cursor,
-            poll_hid=self.poll_hid
+            poll_rid=self.rid
         )
 
     async def add_option(self, cursor: Connection, name: str) -> Optional[int]:
         return await self.client.database.create_poll_option(
             cursor,
-            poll_hid=self.poll_hid,
-            option_name=name
+            poll_rid=self.rid,
+            name=name
         )
 
-    async def remove_option(self, cursor: Connection, option_hid: str):
-        await self.client.database.remove_poll_option(
-            cursor,
-            option_hid=option_hid
-        )
-
-    async def get_option(self, cursor: Connection, option_hid: str):
-        return [i for i in await self.options(cursor) if i.option_hid == option_hid][0]
+    async def get_option(self, cursor: Connection, option_rid: int):
+        return [i for i in await self.options(cursor) if i.rid == option_rid][0]
 
     async def update(self, cursor: Connection):
         options = await self.options(cursor)
-        max_opt = await self.client.database.get_max_poll_option_name(
+        max_opt = await self.client.database.longest_poll_option_name(
             cursor,
-            poll_hid=self.poll_hid
+            poll_rid=self.rid
         )
         total_votes = await self.total_votes(cursor)
 
@@ -253,9 +299,10 @@ class Poll:
         poll_info = f"```\n{await self.description(cursor)}```"
         poll_votes = f"**Total Votes**: {await self.total_votes(cursor)}"
 
+        guild_rid = await self.guild_rid(cursor)
         title_translation = await self.client.translator.translate(
             cursor,
-            guild_hid=await self.guild(cursor),
+            guild_rid=guild_rid,
             key="poll.title",
             name=await self.title(cursor)
         )
@@ -268,16 +315,25 @@ class Poll:
         embed.set_footer(
             text=await self.client.translator.translate(
                 cursor,
-                guild_hid=await self.guild(cursor),
+                guild_rid=guild_rid,
                 key="poll.footer",
-                id=self.poll_hid
+                id=self.rid
             )
         )
-        message = await self.message(cursor)
+        channel = self.client.get_partial_messageable(
+            await self.channel_id(cursor)
+        )
+        message = channel.get_partial_message(
+            await self.message_id(cursor)
+        )
         await message.edit(embed=embed)
 
     async def add_vote(self, cursor: Connection, vote: PollVote):
-        self._last_vote = datetime.datetime.now()
+        raise Exception(
+            "rewrite this as add_vote(cursor, option, user)"
+        )
+
+        self._last_vote = datetime.now()
         _option_hid, *_ = Database.save_unpack(self.client.option_hashids.decode(vote.option))
 
         _vote_hid, = await cursor.fetchrow(
@@ -290,12 +346,11 @@ class Poll:
     async def user_voted(self, cursor: Connection, user: int):
         voted = await self.client.database.poll_user_voted(
             cursor,
-            poll_hid=self.poll_hid,
+            poll_rid=self.rid,
             user_id=user
         )
 
         return voted
 
     async def option_count(self, cursor: Connection):
-        return await self.client.database.poll_option_count(cursor, self.poll_hid)
-
+        return await self.client.database.poll_option_count(cursor, self.rid)
