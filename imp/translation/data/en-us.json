@@ -13,5 +13,6 @@
   "poll.stop.success": "The poll `{id}` stopped successfully.",
   "poll.create.success":  "The poll `{id}` (`{title}`) was created successfully.",
   "poll.list.title": "All polls:",
+  "poll.create.maximum_reached": "You can't have more than **{count}** polls simultaneously.",
   "settings.set_language.success": "The language was set to `{language}` successfully."
 }

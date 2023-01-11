@@ -19,7 +19,7 @@ class Poll:
     POLL_UPDATE_TIME = 10
     POLL_MAX_OPTIONS = 8
 
-    def __init__(self, client: BetterBot, poll_rid: int):
+    def __init__(self, client: "BetterBot", poll_rid: int):
         self.client = client
         self._rid = poll_rid
         self._hid: Optional[str] = None
@@ -48,7 +48,7 @@ class Poll:
             poll_description: Optional[str] = None
     ):
         async with client.pool.acquire() as cursor:
-            poll_hid = await client.database.create_poll(
+            poll_rid = await client.database.create_poll(
                 cursor,
                 guild_rid=_guild_hid,
                 channel_id=channel_id,
@@ -57,14 +57,14 @@ class Poll:
                 poll_description=poll_description
             )
 
-            return cls(client, poll_hid)
+            return cls(client, poll_rid)
 
     def set_view(self, view: PollView):
         self.view = view
 
     @property
     def rid(self) -> int:
-        return self.rid
+        return self._rid
 
     @property
     def hid(self) -> str:
@@ -75,19 +75,18 @@ class Poll:
         return self._hid
 
     async def started(self, cursor: Connection) -> bool:
-        if self.started is not None:
-            return self.started
+        if self._started is not None:
+            return self._started
 
         self._started = await self.client.database.poll_started(
             cursor,
             poll_rid=self.rid
         )
-        return self.started
+        return self._started
 
     async def title(self, cursor: Connection) -> str:
         if self._title is not None:
             return self._title
-
         self._title = await self.client.database.poll_title(
             cursor,
             poll_rid=self.rid
@@ -140,7 +139,6 @@ class Poll:
     async def channel_id(self, cursor: Connection):
         if self._channel_id is not None:
             return self._channel_id
-
         self._channel_id = await self.client.database.poll_channel_id(
             cursor,
             poll_rid=self.rid
@@ -222,7 +220,7 @@ class Poll:
             cursor,
             guild_rid=guild_rid,
             key="poll.title",
-            name=(await self.title(cursor)).upper()
+            name=await self.title(cursor)
         )
         stopped_translation = await self.client.translator.translate(
             cursor,
@@ -239,7 +237,7 @@ class Poll:
                 cursor,
                 guild_rid=guild_rid,
                 key="poll.footer",
-                id=self.rid
+                id=self.hid
             )
         )
         channel = self.client.get_partial_messageable(
@@ -306,7 +304,6 @@ class Poll:
             key="poll.title",
             name=await self.title(cursor)
         )
-        print(title_translation)
         embed = discord.Embed(
             title=title_translation,
             description=f"{poll_info}\n{color_string}\n{poll_votes}\n{option_string}",
@@ -317,7 +314,7 @@ class Poll:
                 cursor,
                 guild_rid=guild_rid,
                 key="poll.footer",
-                id=self.rid
+                id=self.hid
             )
         )
         channel = self.client.get_partial_messageable(
@@ -329,9 +326,7 @@ class Poll:
         await message.edit(embed=embed)
 
     async def add_vote(self, cursor: Connection, vote: PollVote):
-        raise Exception(
-            "rewrite this as add_vote(cursor, option, user)"
-        )
+        # todo: rewrite this as add_vote(cursor, option, user)
 
         self._last_vote = datetime.now()
         _option_hid, *_ = Database.save_unpack(self.client.option_hashids.decode(vote.option))

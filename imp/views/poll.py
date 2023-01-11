@@ -80,7 +80,7 @@ class PollStartButton(ui.Button):
                     cursor,
                     guild_rid=await self.poll.guild_rid(cursor),
                     key="poll.start.success",
-                    id=self.poll.rid
+                    id=self.poll.hid
                 ),
                 ephemeral=True
             )
@@ -104,7 +104,7 @@ class PollStopButton(ui.Button):
                     cursor,
                     guild_rid=await self.poll.guild_rid(cursor),
                     key="poll.stop.success",
-                    id=self.poll.rid
+                    id=self.poll.hid
                 ),
                 ephemeral=True
             )
@@ -124,16 +124,16 @@ class PollView(ui.View):
                     option,
                     label=await option.name(cursor),
                     emoji=Emojis.emojis[i],
-                    custom_id=f"poll:{self.poll.rid}:option:{option.hid}")
+                    custom_id=f"poll:{self.poll.hid}:option:{option.hid}")
             )
 
         return self
 
     async def add_stop(self):
-        self.add_item(PollStopButton(self.poll, f"poll:{self.poll.rid}:stop"))
+        self.add_item(PollStopButton(self.poll, f"poll:{self.poll.hid}:stop"))
 
     async def add_start(self):
-        self.add_item(PollStartButton(self.poll, f"poll:{self.poll.rid}:start"))
+        self.add_item(PollStartButton(self.poll, f"poll:{self.poll.hid}:start"))
 
     async def press_start(self, cursor: Connection):
         self.clear_items()

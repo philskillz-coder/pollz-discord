@@ -29,7 +29,7 @@ class PollOption:
         if self._hid is not None:
             return self._hid
 
-        self._hid = self.poll.client.option_hashids.encode(self._hid)
+        self._hid = self.poll.client.option_hashids.encode(self.rid)
         return self._hid
 
     async def name(self, cursor: Connection) -> str:

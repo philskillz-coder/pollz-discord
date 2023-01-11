@@ -7,6 +7,8 @@ from typing import List, Tuple
 import asyncio
 from argparse import ArgumentParser
 
+discord.utils.setup_logging()
+
 parser = ArgumentParser()
 parser.add_argument(
     "-c", "--configuration",
@@ -21,7 +23,6 @@ parser.add_argument(
 
 sys_args = parser.parse_args()
 
-discord.utils.setup_logging()
 
 
 class Bot(BetterBot):
@@ -43,11 +44,11 @@ class Bot(BetterBot):
     async def prepare_polls(self):
         async with self.pool.acquire() as cursor:
             # noinspection SpellCheckingInspection
-            poll_hids: List[Tuple[int, ]] = await cursor.fetch("SELECT id FROM polls")
+            poll_rids: List[Tuple[int, ]] = await cursor.fetch("SELECT id FROM polls")
 
-            for _poll_hid, in poll_hids:
-                poll = self.manager.init_poll(self.poll_hashids.encode(_poll_hid))
-                self.log("prepare_polls", f"Added poll: {await poll.title(cursor)}@{poll.rid}")
+            for poll_rid, in poll_rids:
+                poll = self.manager.init_poll(poll_rid)
+                self.log("prepare_polls", f"Added poll: {await poll.title(cursor)}@{poll_rid}")
                 view = await PollView(poll=poll).run(cursor)
                 poll.set_view(view)
 

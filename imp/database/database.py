@@ -125,8 +125,18 @@ class Database:
             language, guild_rid
         )
 
-    async def guild_poll_ids(self, cursor: Connection, /, guild_rid: int) -> RT_GENERIC[List[str]]:
-        return await cursor.fetch("SELECT \"id\" FROM polls WHERE \"guild\" = $1", guild_rid)
+    async def guild_poll_count(self, cursor: Connection, /, guild_rid: int) -> RT_GENERIC[int]:
+        values: DB_GENERIC[int] = await cursor.fetchrow(
+            "SELECT count(\"id\") FROM polls WHERE \"guild\" = $1",
+            guild_rid
+        )
+        count, *_ = Database.save_unpack(values)
+        return count
+
+    async def guild_poll_ids(self, cursor: Connection, /, guild_rid: int) -> RT_GENERIC[List[int]]:
+        return [
+            i for i, in await cursor.fetch("SELECT \"id\" FROM polls WHERE \"guild\" = $1", guild_rid)
+        ]
 
     async def poll_exists(self, cursor: Connection, /, poll_rid: int) -> RT_GENERIC[bool]:
         values: DB_GENERIC[bool] = await cursor.fetchrow(
@@ -242,7 +252,6 @@ class Database:
             poll_rid
         )
         channel_id, *_ = Database.save_unpack(values)
-
         return channel_id
 
     async def poll_options(self, cursor: Connection, /, poll_rid: int) -> RT_GENERIC[List[int]]:
@@ -308,12 +317,12 @@ class Database:
 
         return option_exists
 
-    async def option_poll(self, cursor: Connection, /, option_rid: int) -> RT_GENERIC[str]:
+    async def option_poll(self, cursor: Connection, /, option_rid: int) -> RT_GENERIC[int]:
         values: DB_GENERIC[int] = await cursor.fetchrow(
             "SELECT \"poll\".\"id\" FROM poll_options AS \"option\" JOIN polls AS \"poll\" on \"option\".\"poll\" = "
             "\"poll\".\"id\" WHERE \"option\".\"id\" = $1",
             option_rid
         )
-        poll_hid, *_ = Database.save_unpack(values)
+        poll_rid, *_ = Database.save_unpack(values)
 
-        return poll_hid
+        return poll_rid

@@ -7,6 +7,7 @@ import discord
 from discord import app_commands, Embed
 
 from imp.better.cog import BetterCog
+from imp.classes import Poll
 from imp.transformers import POLL_TRANSFORMER, LANGUAGE_TRANSFORMER
 from imp.views.poll import PollView
 import matplotlib.pyplot as plt
@@ -27,17 +28,31 @@ class Main(BetterCog):
         description="Some info for the poll"
     )
     async def create_poll(self, interaction: BetterInteraction, title: str, description: str = None):
+        # todo: move checks in separate decorator checks
+        # todo: maximum title length
+        # todo: maximum description length
         async with self.client.pool.acquire() as cursor:
-            _guild_hid = await self.client.database.get_guild_rid(
+            guild_rid = await self.client.database.get_guild_rid(
                 cursor,
                 guild_id=interaction.guild.id
             )
+
+            if await self.client.database.guild_poll_count(cursor, guild_rid) > Poll.GUILD_MAX_POLLS:
+                return await interaction.response.send_message(
+                    content=await self.client.translator.translate(
+                        cursor,
+                        guild_rid=guild_rid,
+                        key="poll.create.maximum_reached",
+                        count=Poll.GUILD_MAX_POLLS
+                    ),
+                    ephemeral=True
+                )
 
             message = await interaction.channel.send(
                 embed=Embed(
                     title=await self.client.translator.translate(
                         cursor,
-                        guild_rid=_guild_hid,
+                        guild_rid=guild_rid,
                         key="poll.title",
                         name=title
                     ),
@@ -47,22 +62,22 @@ class Main(BetterCog):
                 .set_footer(
                     text=await self.client.translator.translate(
                         cursor,
-                        guild_rid=_guild_hid,
+                        guild_rid=guild_rid,
                         key="poll.footer",
                         id="#~"
                     )
                 )
             )
 
-            poll_id = await self.client.database.create_poll(
+            poll_rid = await self.client.database.create_poll(
                 cursor,
-                guild_rid=_guild_hid,
+                guild_rid=guild_rid,
                 channel_id=message.channel.id,
                 message_id=message.id,
-                poll_title=title.upper(),
+                poll_title=title,
                 poll_description=description
             )
-            poll = self.client.manager.get_poll(poll_id)
+            poll = self.client.manager.get_poll(poll_rid)
             view = await PollView(poll).run(cursor)
             poll.set_view(view)
 
@@ -72,7 +87,7 @@ class Main(BetterCog):
                 embed=(message.embeds[0].set_footer(
                     text=await self.client.translator.translate(
                         cursor,
-                        guild_rid=_guild_hid,
+                        guild_rid=guild_rid,
                         key="poll.footer",
                         id=poll.hid
                     )
@@ -83,7 +98,7 @@ class Main(BetterCog):
             return await interaction.response.send_message(
                 content=await self.client.translator.translate(
                     cursor,
-                    guild_rid=_guild_hid,
+                    guild_rid=guild_rid,
                     key="poll.create.success",
                     title=title,
                     id=poll.hid
@@ -105,8 +120,10 @@ class Main(BetterCog):
             poll: POLL_TRANSFORMER,
             name: str
     ):
+        # todo: make check in separate decorator check
+        # todo: max name length
         async with self.client.pool.acquire() as cursor:
-            _guild_hid = await self.client.database.get_guild_rid(
+            guild_rid = await self.client.database.get_guild_rid(
                 cursor,
                 guild_id=interaction.guild.id
             )
@@ -115,7 +132,7 @@ class Main(BetterCog):
                 return await interaction.response.send_message(
                     content=await self.client.translator.translate(
                         cursor,
-                        guild_rid=_guild_hid,
+                        guild_rid=guild_rid,
                         key="poll.add_option.already_started",
                         id=poll.hid
                     ),
@@ -126,7 +143,7 @@ class Main(BetterCog):
                 return await interaction.response.send_message(
                     content=await self.client.translator.translate(
                         cursor,
-                        guild_rid=_guild_hid,
+                        guild_rid=guild_rid,
                         key="poll.add_option.maximum_reached",
                         count=poll.POLL_MAX_OPTIONS
                     ),
@@ -141,52 +158,10 @@ class Main(BetterCog):
             await interaction.response.send_message(
                 content=await self.client.translator.translate(
                     cursor,
-                    guild_rid=_guild_hid,
+                    guild_rid=guild_rid,
                     key="poll.add_option.success",
                     id=poll.hid,
                     option=name
-                ),
-                ephemeral=True
-            )
-
-    @app_commands.command(
-        name="start",
-        description="Start a poll"
-    )
-    @app_commands.describe(
-        poll="The poll you want to start"
-    )
-    async def start_poll(
-            self,
-            interaction: BetterInteraction,
-            poll: POLL_TRANSFORMER
-    ):
-        async with self.client.pool.acquire() as cursor:
-            _guild_hid = await self.client.database.get_guild_rid(
-                cursor,
-                guild_id=interaction.guild.id
-            )
-
-            if await poll.started(cursor):
-                return await interaction.response.send_message(
-                    content=await self.client.translator.translate(
-                        cursor,
-                        guild_rid=_guild_hid,
-                        key="poll.start.already_started",
-                        id=poll.hid
-                    ),
-                    ephemeral=True
-                )
-
-            await poll.start(cursor)
-            self.client.manager.set_poll(poll)
-
-            await interaction.response.send_message(
-                content=await self.client.translator.translate(
-                    cursor,
-                    guild_rid=_guild_hid,
-                    key="poll.start.success",
-                    id=poll.hid
                 ),
                 ephemeral=True
             )
@@ -289,35 +264,41 @@ class Main(BetterCog):
         description="List all your polls"
     )
     async def list(self, interaction: BetterInteraction):
+        # todo: grid arrangement (not vertical)
         async with self.client.pool.acquire() as cursor:
-            _guild_hid = await self.client.database.get_guild_rid(
+            guild_rid = await self.client.database.get_guild_rid(
                 cursor,
                 guild_id=interaction.guild.id
             )
 
             poll_data = []
-            _polls = await self.client.database.guild_poll_ids(
+            poll_rids = await self.client.database.guild_poll_ids(
                 cursor,
-                guild_rid=_guild_hid
+                guild_rid=guild_rid
             )
+
+            for poll_rid in poll_rids:
+                poll = self.client.manager.get_poll(poll_rid)
+                channel = self.client.get_partial_messageable(
+                    await poll.channel_id(cursor)
+                )
+                message = channel.get_partial_message(
+                    await poll.message_id(cursor)
+                )
+
+                poll_data.append(
+                    f"**{await poll.title(cursor)}** ({poll.hid})\n"
+                    f"[message]({message.jump_url})"
+                )
 
             embed = discord.Embed(
                 title=await self.client.translator.translate(
                     cursor,
-                    guild_rid=_guild_hid,
+                    guild_rid=guild_rid,
                     key="poll.list.title"
-                )
+                ),
+                description="\n\n".join(poll_data)
             )
-
-            for poll_hid in _polls:
-                poll = self.client.manager.get_poll(poll_hid)
-
-                poll_data.append(
-                    f"**{await poll.title(cursor)}** ({poll.hid})\n"
-                    f"[message]({(await poll.message_id(cursor)).jump_url})"
-                )
-
-            embed.description = "\n".join(poll_data)
 
             await interaction.response.send_message(
                 embed=embed
@@ -341,23 +322,24 @@ class Main(BetterCog):
             language: LANGUAGE_TRANSFORMER
     ):
         async with self.client.pool.acquire() as cursor:
-            _guild_hid = await self.client.database.get_guild_rid(
+            guild_rid = await self.client.database.get_guild_rid(
                 cursor,
                 guild_id=interaction.guild.id
             )
             await self.client.database.set_guild_language(
                 cursor,
-                guild_rid=_guild_hid,
+                guild_rid=guild_rid,
                 language=language
             )
 
             return await interaction.response.send_message(
                 content=await self.client.translator.translate(
                     cursor,
-                    guild_rid=_guild_hid,
+                    guild_rid=guild_rid,
                     key="settings.set_language.success",
                     language=language
-                )
+                ),
+                ephemeral=True
             )
 
 
