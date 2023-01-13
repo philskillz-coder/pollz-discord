@@ -1,16 +1,14 @@
 from __future__ import annotations
 
-import io
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 import discord
-from discord import app_commands, Embed
+from discord import app_commands, Embed, Permissions
 
 from imp.better.cog import BetterCog
 from imp.classes import Poll
 from imp.transformers import POLL_TRANSFORMER, LANGUAGE_TRANSFORMER
 from imp.views.poll import PollView
-import matplotlib.pyplot as plt
 
 if TYPE_CHECKING:
     from imp.better.bot import BetterBot
@@ -19,7 +17,16 @@ if TYPE_CHECKING:
 
 class Main(BetterCog):
 
-    @app_commands.command(
+    polls = app_commands.Group(
+        name="poll",
+        description="Everything you need for managing polls",
+        guild_only=True,
+        default_permissions=Permissions(
+            administrator=True
+        )
+    )
+
+    @polls.command(
         name="create",
         description="Create a new poll"
     )
@@ -27,10 +34,14 @@ class Main(BetterCog):
         title="The name of the poll",
         description="Some info for the poll"
     )
-    async def create_poll(self, interaction: BetterInteraction, title: str, description: str = None):
+    async def create_poll(
+            self,
+            interaction: BetterInteraction,
+            title: app_commands.Range[str, 1, 50],
+            description: Optional[app_commands.Range[str, 1, 250]] = None
+    ):
+        # todo: send_messages check
         # todo: move checks in separate decorator checks
-        # todo: maximum title length
-        # todo: maximum description length
         async with self.client.pool.acquire() as cursor:
             guild_rid = await self.client.database.get_guild_rid(
                 cursor,
@@ -49,23 +60,8 @@ class Main(BetterCog):
                 )
 
             message = await interaction.channel.send(
-                embed=Embed(
-                    title=await self.client.translator.translate(
-                        cursor,
-                        guild_rid=guild_rid,
-                        key="poll.title",
-                        name=title
-                    ),
-                    description=f"```\n{description}```",
-                    colour=discord.Colour.yellow()
-                )
-                .set_footer(
-                    text=await self.client.translator.translate(
-                        cursor,
-                        guild_rid=guild_rid,
-                        key="poll.footer",
-                        id="#~"
-                    )
+                embed=discord.Embed(
+                    title="#"
                 )
             )
 
@@ -83,17 +79,7 @@ class Main(BetterCog):
 
             self.client.manager.set_poll(poll)
 
-            await message.edit(
-                embed=(message.embeds[0].set_footer(
-                    text=await self.client.translator.translate(
-                        cursor,
-                        guild_rid=guild_rid,
-                        key="poll.footer",
-                        id=poll.hid
-                    )
-                )),
-                view=view
-            )
+            await poll.update(cursor)
 
             return await interaction.response.send_message(
                 content=await self.client.translator.translate(
@@ -106,7 +92,32 @@ class Main(BetterCog):
                 ephemeral=True
             )
 
-    @app_commands.command(
+    @polls.command(
+        name="delete",
+        description="Delete a poll"
+    )
+    @app_commands.describe(
+        poll="The poll to delete"
+    )
+    async def delete_poll(self, interaction: BetterInteraction, poll: POLL_TRANSFORMER):
+        async with self.client.pool.acquire() as cursor:
+            guild_rid = await self.client.database.get_guild_rid(
+                cursor,
+                guild_id=interaction.guild.id
+            )
+
+            await interaction.response.send_message(
+                content=await self.client.translator.translate(
+                    cursor,
+                    guild_rid=guild_rid,
+                    key="poll.delete.success",
+                    id=poll.hid
+                ),
+                ephemeral=True
+            )
+            await poll.stop(cursor)
+
+    @polls.command(
         name="add_option",
         description="Add a option to a poll"
     )
@@ -118,10 +129,9 @@ class Main(BetterCog):
             self,
             interaction: BetterInteraction,
             poll: POLL_TRANSFORMER,
-            name: str
+            name: app_commands.Range[str, 1, 50]
     ):
         # todo: make check in separate decorator check
-        # todo: max name length
         async with self.client.pool.acquire() as cursor:
             guild_rid = await self.client.database.get_guild_rid(
                 cursor,
@@ -166,100 +176,7 @@ class Main(BetterCog):
                 ephemeral=True
             )
 
-    @app_commands.command(
-        name="stop",
-        description="Stop a poll"
-    )
-    @app_commands.describe(
-        poll="The poll you want to stop"
-    )
-    async def stop_poll(
-            self,
-            interaction: BetterInteraction,
-            poll: POLL_TRANSFORMER
-    ):
-        async with self.client.pool.acquire() as cursor:
-            _guild_hid = await self.client.database.get_guild_rid(
-                cursor,
-                guild_id=interaction.guild.id
-            )
-
-            if not (await poll.started(cursor)):
-                return await interaction.response.send_message(
-                    content=await self.client.translator.translate(
-                        cursor,
-                        guild_rid=_guild_hid,
-                        key="poll.stop.not_started",
-                        id=poll.hid
-                    ),
-                    ephemeral=True
-                )
-
-            await poll.stop(cursor)
-            self.client.manager.set_poll(poll)
-
-            await interaction.response.send_message(
-                content=await self.client.translator.translate(
-                    cursor,
-                    guild_rid=_guild_hid,
-                    key="poll.stop.success",
-                    id=poll.hid
-                ),
-                ephemeral=True
-            )
-
-    @app_commands.command(
-        name="stats",
-        description="Get the statistics of a poll"
-    )
-    @app_commands.describe(
-        poll="The poll of which you want to get the statistics"
-    )
-    async def get_stats(
-            self,
-            interaction: BetterInteraction,
-            poll: POLL_TRANSFORMER
-    ):
-        async with self.client.pool.acquire() as cursor:
-            total_votes = await poll.total_votes(cursor)
-            _labels = await self.client.database.poll_options(
-                cursor,
-                poll_rid=poll.rid
-            )
-            labels = [
-                await self.client.database.poll_option_name(
-                    cursor,
-                    option_rid=_option_hid
-                ) for _option_hid in _labels
-            ]
-
-            sizes = [
-                round(await self.client.database.option_vote_count(
-                    cursor,
-                    option_rid=option_hid
-                ) / total_votes, 2) if total_votes >= 1 else 0.00 for option_hid in _labels
-            ]
-
-        fig1, ax1 = plt.subplots()
-        ax1.pie(sizes, labels=labels, autopct='%1.1f%%', shadow=True, startangle=90)
-        ax1.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
-
-        buf = io.BytesIO()
-        plt.savefig(buf, format="png")
-        plt.close()
-        buf.seek(0)
-
-        file = discord.File(buf, filename="stats.png")
-        buf.close()
-
-        await interaction.response.send_message(
-            file=file,
-            ephemeral=True
-        )
-
-        file.close()
-
-    @app_commands.command(
+    @polls.command(
         name="list",
         description="List all your polls"
     )
@@ -301,17 +218,22 @@ class Main(BetterCog):
             )
 
             await interaction.response.send_message(
-                embed=embed
+                embed=embed,
+                ephemeral=True
             )
 
-    group = app_commands.Group(
+    settings = app_commands.Group(
         name="settings",
-        description="Guild settings"
+        description="Your guild settings",
+        guild_only=True,
+        default_permissions=Permissions(
+            administrator=True
+        )
     )
 
-    @group.command(
+    @settings.command(
         name="language",
-        description="Set your guilds language"
+        description="Set or get your guilds language"
     )
     @app_commands.checks.has_permissions(
         administrator=True
@@ -319,13 +241,28 @@ class Main(BetterCog):
     async def language(
             self,
             interaction: BetterInteraction,
-            language: LANGUAGE_TRANSFORMER
+            language: Optional[LANGUAGE_TRANSFORMER]
     ):
         async with self.client.pool.acquire() as cursor:
             guild_rid = await self.client.database.get_guild_rid(
                 cursor,
                 guild_id=interaction.guild.id
             )
+            if language is None:
+                guild_language = await self.client.database.guild_language(
+                    cursor,
+                    guild_rid=guild_rid
+                )
+                return await interaction.response.send_message(
+                    content=await self.client.translator.translate(
+                        cursor,
+                        guild_rid=guild_rid,
+                        key="settings.language.get",
+                        language=guild_language
+                    ),
+                    ephemeral=True
+                )
+
             await self.client.database.set_guild_language(
                 cursor,
                 guild_rid=guild_rid,
@@ -336,7 +273,7 @@ class Main(BetterCog):
                 content=await self.client.translator.translate(
                     cursor,
                     guild_rid=guild_rid,
-                    key="settings.set_language.success",
+                    key="settings.language.success",
                     language=language
                 ),
                 ephemeral=True

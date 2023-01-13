@@ -13,6 +13,8 @@
   "poll.stop.success": "Die Abstimmung `{id}` wurde gestoppt.",
   "poll.create.success":  "Die Abstimmung `{id}` (`{title}`) wurde erfolgreich erstellt.",
   "poll.list.title": "Alle Abstimmungen:",
+  "poll.delete.success": "Abstimmung `{id}` erfolgreich gelöscht.",
   "poll.create.maximum_reached": "Du kannst nicht mehr als **{count}** Abstimmungen gleichzeitig haben.",
-  "settings.set_language.success": "Die Sprache wurde erfolgreich auf `{language}` gesetzt."
+  "settings.language.success": "Die Sprache wurde erfolgreich auf `{language}` gesetzt.",
+  "settings.language.get": "Die jetzige Sprache ist `{language}`"
 }

@@ -13,6 +13,8 @@
   "poll.stop.success",
   "poll.create.success",
   "poll.list.title",
+  "poll.delete.success",
   "poll.create.maximum_reached",
-  "settings.set_language.success"
+  "settings.language.success",
+  "settings.language.get"
 ]

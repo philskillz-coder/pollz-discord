@@ -24,7 +24,6 @@ parser.add_argument(
 sys_args = parser.parse_args()
 
 
-
 class Bot(BetterBot):
     INIT_COGS = [
         "cogs.main",
@@ -37,8 +36,10 @@ class Bot(BetterBot):
 
     async def sync(self):
         # await self.tree.sync()
+        # self.log("sync", "Global tree sync")
         # for guild in self.config["guilds"]:
         #     await self.tree.sync(guild=guild)
+        #     self.log("sync", "synced guild %s" % guild)
         pass
 
     async def prepare_polls(self):
