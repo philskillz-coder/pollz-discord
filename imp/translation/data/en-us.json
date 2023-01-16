@@ -15,6 +15,15 @@
   "poll.list.title": "All polls:",
   "poll.delete.success": "Successfully deleted poll `{id}`.",
   "poll.create.maximum_reached": "You can't have more than **{count}** polls simultaneously.",
+  "poll.total_votes": "{votes} total votes",
+  "poll.option_count": "{options}/{max} options",
   "settings.language.success": "The language was set to `{language}` successfully.",
-  "settings.language.get": "The current language is `{language}`"
+  "settings.language.get": "The current language is `{language}`",
+  "checks.language.not_exist":  "A language named `{value}` does not exist.",
+  "checks.option.not_exist": "A option named `{value}` does not exist.",
+  "checks.poll.not_exist":  "A poll named `{value}` does not exist.",
+  "checks.poll_started.not_started":  "This poll is not started.",
+  "checks.poll_started.already_started": "This poll is already started",
+  "checks.poll_finished.not_finished":  "This poll has not finished.",
+  "checks.poll_finished.already_finished": "This poll has already finished"
 }

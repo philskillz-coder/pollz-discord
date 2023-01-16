@@ -1,34 +1,8 @@
-from __future__ import annotations
-
-from typing import Callable, Coroutine, Any
-
-from imp import errors
-
-from imp.better.interaction import BetterInteraction
-
-CALLBACK = Callable[[BetterInteraction], Coroutine[Any, Any, bool]]
+from discord import app_commands
 
 
-class BetterCheck:
-    def __init__(self, name: str, callback: CALLBACK):
-        self.name = name
-        self.callback = callback
-
-    async def __call__(self, interaction: BetterInteraction):
-        try:
-            return await self.callback(interaction)
-
-        except errors.BetterCheckException as e:
-            await interaction.response.send_message(
-                **e.content,
-                ephemeral=True
-            )
-
-            raise errors.HandledCheckException(e, message="%s check failed" % self.name)
-
-
-def better_check(name: str):
-    def _better_check(callback: CALLBACK):
-        return BetterCheck(name, callback)
-
-    return _better_check
+class BetterCheckFailure(app_commands.CheckFailure):
+    def __init__(self, guild_id: int, key: str, **format_args):
+        self.guild_id = guild_id
+        self.key = key
+        self.format_args = format_args

@@ -6,7 +6,7 @@ from discord import app_commands
 
 from imp.classes.option import PollOption
 from imp.database.database import Database
-from imp.errors import TransformerException
+from imp.better.check import BetterCheckFailure
 
 from typing import TYPE_CHECKING, List, Tuple
 if TYPE_CHECKING:
@@ -18,8 +18,12 @@ class Option_Transformer(app_commands.Transformer, ABC):
     async def transform(cls, interaction: BetterInteraction, value: str) -> PollOption:
         option_rid, *_ = Database.save_unpack(interaction.client.option_hashids.decode(value))
         if option_rid is None:
-            raise TransformerException(f"A poll option with the id `{value}` does not exist!")
-
+            # raise TransformerException(f"A poll option with the id `{value}` does not exist!")
+            raise BetterCheckFailure(
+                interaction.guild.id,
+                "checks.option.not_exist",
+                value=value
+            )
         async with interaction.client.pool.acquire() as cursor:
             poll_rid = await interaction.client.database.option_poll(
                 cursor,

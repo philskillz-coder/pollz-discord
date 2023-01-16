@@ -15,6 +15,15 @@
   "poll.list.title": "Alle Abstimmungen:",
   "poll.delete.success": "Abstimmung `{id}` erfolgreich gelöscht.",
   "poll.create.maximum_reached": "Du kannst nicht mehr als **{count}** Abstimmungen gleichzeitig haben.",
+  "poll.total_votes": "{votes} stimmen",
+  "poll.option_count": "{options}/{max} Optionen",
   "settings.language.success": "Die Sprache wurde erfolgreich auf `{language}` gesetzt.",
-  "settings.language.get": "Die jetzige Sprache ist `{language}`"
+  "settings.language.get": "Die jetzige Sprache ist `{language}`",
+  "checks.language.not_exist":  "Eine Sprache mit dem name `{value}` existiert nicht.",
+  "checks.option.not_exist": "Eine Option mit dem Name `{value}` existiert nicht.",
+  "checks.poll.not_exist":  "Eine Umfrage mit dem Name `{value}` existiert nicht.",
+  "checks.poll_started.not_started":  "Diese Abstimmung ist noch nicht gestartet.",
+  "checks.poll_started.already_started": "Diese Abstimmung ist schon gestartet.",
+  "checks.poll_finished.not_finished":  "Diese Abstimmung ist noch nicht beendet.",
+  "checks.poll_finished.already_finished": "Diese Abstimmung ist schon beendet."
 }

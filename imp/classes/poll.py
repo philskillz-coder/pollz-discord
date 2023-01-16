@@ -4,9 +4,9 @@ from datetime import datetime
 
 from imp.classes.option import PollOption
 from imp.classes.vote import PollVote
-from imp.database.database import Database
 from imp.emoji import Emojis
 from imp.views.poll import PollView
+from numerize.numerize import numerize
 
 from typing import TYPE_CHECKING, Optional, List, Tuple
 
@@ -76,6 +76,12 @@ class Poll:
 
     async def started(self, cursor: Connection) -> bool:
         return await self.client.database.poll_started(
+            cursor,
+            poll_rid=self.rid
+        )
+
+    async def finished(self, cursor: Connection) -> bool:
+        return await self.client.database.poll_finished(
             cursor,
             poll_rid=self.rid
         )
@@ -302,10 +308,14 @@ class Poll:
         _poll_description = await self.description(cursor)
         poll_description = f"```\n{_poll_description}```" if _poll_description is not None else ""
 
-        # todo: create translation
-        vote_string = f"{total_votes} votes in total"
-
         guild_rid = await self.guild_rid(cursor)
+        vote_string = await self.client.translator.translate(
+            cursor,
+            guild_rid=guild_rid,
+            key="poll.total_votes",
+            votes=numerize(total_votes, 1)
+        )
+
         title_translation = await self.client.translator.translate(
             cursor,
             guild_rid=guild_rid,
@@ -356,10 +366,15 @@ class Poll:
         _poll_description = await self.description(cursor)
         poll_description = f"```\n{_poll_description}```" if _poll_description is not None else ""
 
-        # todo: create translation
-        option_count = f"{len(options)}/{self.POLL_MAX_OPTIONS} Options"
-
         guild_rid = await self.guild_rid(cursor)
+        option_count = await self.client.translator.translate(
+            cursor,
+            guild_rid=guild_rid,
+            key="poll.option_count",
+            options=len(options),
+            max=self.POLL_MAX_OPTIONS
+        )
+
         title_translation = await self.client.translator.translate(
             cursor,
             guild_rid=guild_rid,

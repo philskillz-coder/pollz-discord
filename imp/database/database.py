@@ -31,6 +31,7 @@ CREATE TABLE polls (
     "id" SERIAL PRIMARY KEY NOT NULL UNIQUE,
     "guild" BIGINT NOT NULL,
     "started" BOOLEAN NOT NULL DEFAULT FALSE,
+    "finished" BOOLEAN NOT NULL DEFAULT FALSE CHECK(NOT ("started" AND "finished")),
     
     CONSTRAINT fk_guild FOREIGN KEY("guild") REFERENCES guilds("id") ON DELETE CASCADE
 );
@@ -156,6 +157,15 @@ class Database:
 
         return started
 
+    async def poll_finished(self, cursor: Connection, /, poll_rid: int) -> RT_GENERIC[bool]:
+        values: DB_GENERIC[bool] = await cursor.fetchrow(
+            "SELECT \"finished\" FROM polls WHERE \"id\" = $1",
+            poll_rid
+        )
+        finished, *_ = Database.save_unpack(values)
+
+        return finished
+
     async def poll_user_voted(self, cursor: Connection, /, poll_rid: int, user_id: int) -> RT_GENERIC[bool]:
         values: DB_GENERIC[bool] = await cursor.fetchrow(
             "SELECT EXISTS(SELECT 1 FROM poll_votes AS \"vote\" JOIN poll_options AS \"option\" ON "
@@ -210,6 +220,9 @@ class Database:
 
     async def poll_stop(self, cursor: Connection, /, poll_rid: int) -> None:
         await cursor.execute("UPDATE polls SET \"started\" = FALSE WHERE \"id\" = $1", poll_rid)
+
+    async def poll_finish(self, cursor: Connection, /, poll_rid: int) -> None:
+        await cursor.execute("UPDATE polls SET \"finished\" = TRUE, \"started\" = FALSE WHERE \"id\" = $1", poll_rid)
 
     async def poll_delete(self, cursor: Connection, /, poll_rid: int) -> None:
         await cursor.execute("DELETE FROM polls WHERE \"id\" = $1", poll_rid)

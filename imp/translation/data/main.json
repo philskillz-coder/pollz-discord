@@ -15,6 +15,15 @@
   "poll.list.title",
   "poll.delete.success",
   "poll.create.maximum_reached",
+  "poll.total_votes",
+  "poll.option_count",
   "settings.language.success",
-  "settings.language.get"
+  "settings.language.get",
+  "checks.language.not_exist",
+  "checks.option.not_exist",
+  "checks.poll.not_exist",
+  "checks.poll_started.not_started",
+  "checks.poll_started.already_started",
+  "checks.poll_finished.not_finished",
+  "checks.poll_finished.already_finished"
 ]

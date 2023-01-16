@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING
 
-import discord
 from asyncpg import Connection
 from discord import ui
 
@@ -61,70 +60,68 @@ class PollOptionButton(ui.Button):
                 await self.option.poll.update(cursor)
 
 
-class PollStartButton(ui.Button):
-    def __init__(self, poll: Poll, custom_id: str, row: int):
-        super().__init__(
-            label="Start",
-            custom_id=custom_id,
-            style=discord.ButtonStyle.green,
-            row=row
-        )
-        self.poll = poll
+# class PollStartButton(ui.Button):
+#     def __init__(self, poll: Poll, custom_id: str, row: int):
+#         super().__init__(
+#             label="Start",
+#             custom_id=custom_id,
+#             style=discord.ButtonStyle.green,
+#             row=row
+#         )
+#         self.poll = poll
+#
+#     async def callback(self, interaction: BetterInteraction):
+#         if not interaction.user.resolved_permissions.administrator:
+#             return await interaction.response.send_message(
+#                 "No permissions",
+#                 ephemeral=True
+#             )
+#         async with interaction.client.pool.acquire() as cursor:
+#             await interaction.client.database.poll_start(
+#                 cursor,
+#                 poll_rid=self.poll.rid
+#             )
+#             await interaction.response.send_message(
+#                 content=await self.poll.client.translator.translate(
+#                     cursor,
+#                     guild_rid=await self.poll.guild_rid(cursor),
+#                     key="poll.start.success",
+#                     id=self.poll.hid
+#                 ),
+#                 ephemeral=True
+#             )
+#             await self.view.press_start(cursor)
+#             await self.poll.update(cursor)
 
-    async def callback(self, interaction: BetterInteraction):
-        if not interaction.user.resolved_permissions.administrator:
-            # todo: create response:
-            return await interaction.response.send_message(
-                "No permissions",
-                ephemeral=True
-            )
-        async with interaction.client.pool.acquire() as cursor:
-            await interaction.client.database.poll_start(
-                cursor,
-                poll_rid=self.poll.rid
-            )
-            await interaction.response.send_message(
-                content=await self.poll.client.translator.translate(
-                    cursor,
-                    guild_rid=await self.poll.guild_rid(cursor),
-                    key="poll.start.success",
-                    id=self.poll.hid
-                ),
-                ephemeral=True
-            )
-            await self.view.press_start(cursor)
-            await self.poll.update(cursor)
 
-
-class PollStopButton(ui.Button):
-    def __init__(self, poll: Poll, custom_id: str, row: int):
-        super().__init__(
-            label="Stop",
-            custom_id=custom_id,
-            style=discord.ButtonStyle.red,
-            row=row
-        )
-        self.poll = poll
-
-    async def callback(self, interaction: BetterInteraction):
-        if not interaction.user.resolved_permissions.administrator:
-            # todo: create response:
-            return await interaction.response.send_message(
-                "No permissions",
-                ephemeral=True
-            )
-        async with interaction.client.pool.acquire() as cursor:
-            await interaction.response.send_message(
-                content=await self.poll.client.translator.translate(
-                    cursor,
-                    guild_rid=await self.poll.guild_rid(cursor),
-                    key="poll.stop.success",
-                    id=self.poll.hid
-                ),
-                ephemeral=True
-            )
-
-            await self.poll.stop(cursor)
+# class PollStopButton(ui.Button):
+#     def __init__(self, poll: Poll, custom_id: str, row: int):
+#         super().__init__(
+#             label="Stop",
+#             custom_id=custom_id,
+#             style=discord.ButtonStyle.red,
+#             row=row
+#         )
+#         self.poll = poll
+#
+#     async def callback(self, interaction: BetterInteraction):
+#         if not interaction.user.resolved_permissions.administrator:
+#             return await interaction.response.send_message(
+#                 "No permissions",
+#                 ephemeral=True
+#             )
+#         async with interaction.client.pool.acquire() as cursor:
+#             await interaction.response.send_message(
+#                 content=await self.poll.client.translator.translate(
+#                     cursor,
+#                     guild_rid=await self.poll.guild_rid(cursor),
+#                     key="poll.stop.success",
+#                     id=self.poll.hid
+#                 ),
+#                 ephemeral=True
+#             )
+#
+#             await self.poll.stop(cursor)
 
 
 class PollView(ui.View):
@@ -149,32 +146,31 @@ class PollView(ui.View):
 
         return self
 
-    async def add_stop(self):
-        self.add_item(PollStopButton(self.poll, f"poll:{self.poll.hid}:stop", row=self._option_count//4+1))
+    # async def add_stop(self):
+    #     self.add_item(PollStopButton(self.poll, f"poll:{self.poll.hid}:stop", row=self._option_count//4+1))
 
-    async def add_start(self):
-        self.add_item(PollStartButton(self.poll, f"poll:{self.poll.hid}:start", row=self._option_count//4+1))
+    # async def add_start(self):
+    #     self.add_item(PollStartButton(self.poll, f"poll:{self.poll.hid}:start", row=self._option_count//4+1))
 
     async def press_start(self, cursor: Connection):
         self.clear_items()
         await self.add_options(cursor)
-        await self.add_stop()
+        # await self.add_stop()
 
     async def press_stop(self):
         self.clear_items()
         self.stop()
 
     async def run(self, cursor: Connection):
-        started = await self.poll.client.database.poll_started(
+        started = await self.poll.started(
             cursor,
-            poll_rid=self.poll.rid
         )
 
         if started:
             await self.add_options(cursor)
-            await self.add_stop()
+            # await self.add_stop()
 
-        else:
-            await self.add_start()
+        # else:
+        #     await self.add_start()
 
         return self

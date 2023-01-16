@@ -9,7 +9,7 @@ from imp.better.cog import BetterCog
 from imp.classes import Poll
 from imp.transformers import POLL_TRANSFORMER, LANGUAGE_TRANSFORMER
 from imp.views.poll import PollView
-
+from imp import checks
 if TYPE_CHECKING:
     from imp.better.bot import BetterBot
     from imp.better.interaction import BetterInteraction
@@ -91,6 +91,54 @@ class Main(BetterCog):
                 ),
                 ephemeral=True
             )
+            
+    @polls.command(
+        name="start",
+        description="Start a poll"
+    )
+    @app_commands.describe(
+        poll="The poll to start"
+    )
+    @checks.poll.poll_started(False)
+    async def start_poll(self, interaction: BetterInteraction, poll: POLL_TRANSFORMER):
+        async with interaction.client.pool.acquire() as cursor:
+            await interaction.client.database.poll_start(
+                cursor,
+                poll_rid=poll.rid
+            )
+            await poll.update(cursor)
+            await interaction.response.send_message(
+                content=await poll.client.translator.translate(
+                    cursor,
+                    guild_rid=await poll.guild_rid(cursor),
+                    key="poll.start.success",
+                    id=poll.hid
+                ),
+                ephemeral=True
+            )
+            await poll.view.press_start(cursor)
+    
+    @polls.command(
+        name="stop",
+        description="Stop a poll"
+    )
+    @app_commands.describe(
+        poll="The poll to stop"
+    )
+    @checks.poll.poll_started(False)
+    async def stop_poll(self, interaction: BetterInteraction, poll: POLL_TRANSFORMER):
+        async with interaction.client.pool.acquire() as cursor:
+            await interaction.response.send_message(
+                content=await self.client.translator.translate(
+                    cursor,
+                    guild_rid=await poll.guild_rid(cursor),
+                    key="poll.stop.success",
+                    id=poll.hid
+                ),
+                ephemeral=True
+            )
+
+            await poll.stop(cursor)
 
     @polls.command(
         name="delete",
@@ -99,6 +147,7 @@ class Main(BetterCog):
     @app_commands.describe(
         poll="The poll to delete"
     )
+    @checks.poll.poll_finished(True)
     async def delete_poll(self, interaction: BetterInteraction, poll: POLL_TRANSFORMER):
         async with self.client.pool.acquire() as cursor:
             guild_rid = await self.client.database.get_guild_rid(
@@ -234,9 +283,6 @@ class Main(BetterCog):
     @settings.command(
         name="language",
         description="Set or get your guilds language"
-    )
-    @app_commands.checks.has_permissions(
-        administrator=True
     )
     async def language(
             self,

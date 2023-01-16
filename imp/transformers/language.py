@@ -1,9 +1,7 @@
 from abc import ABC
 
 from discord import app_commands
-
-from imp.errors import TransformerException
-
+from imp.better.check import BetterCheckFailure
 from typing import TYPE_CHECKING, List
 if TYPE_CHECKING:
     from imp.better.interaction import BetterInteraction
@@ -13,8 +11,12 @@ class Language_Transformer(app_commands.Transformer, ABC):
     @classmethod
     async def transform(cls, interaction: "BetterInteraction", value: str) -> str:
         if value not in interaction.client.translator.available_locales:
-            raise TransformerException("The language `%s` does not exist." % value)
-
+            # raise BetterCheckFailure("The language `%s` does not exist." % value)
+            raise BetterCheckFailure(
+                interaction.guild.id,
+                "checks.language.not_exist",
+                value=value
+            )
         return value
 
     @classmethod

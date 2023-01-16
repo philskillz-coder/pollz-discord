@@ -18,7 +18,6 @@ class AdvancedFormat(dict):
 
 
 class Translator(BetterLogger):
-
     DEFAULT_LOCALE = "de-de"
 
     # noinspection PyTypeChecker
